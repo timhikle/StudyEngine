@@ -67,4 +67,5 @@ export interface AppState {
   delayPhase: (phaseIndex: number, minutes: number) => void;
   clearSchedule: () => void;
   addStudiedSeconds: (seconds: number) => void;
+  syncFromService: () => Promise<void>;
 }

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { colors, typography, spacing, borderRadius } from './src/theme';
 import { useStore } from './src/store/useStore';
+import { BackgroundService } from './src/services/background';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { ConsoleScreen } from './src/screens/ConsoleScreen';
 import { ScheduleScreen } from './src/screens/ScheduleScreen';
@@ -17,6 +18,11 @@ const TABS: { key: Screen; icon: string; label: string }[] = [
 
 const App: React.FC = () => {
   const [activeScreen, setActiveScreen] = React.useState<Screen>('home');
+  const syncFromService = useStore((s) => s.syncFromService);
+
+  useEffect(() => {
+    syncFromService();
+  }, []);
 
   const renderScreen = () => {
     switch (activeScreen) {

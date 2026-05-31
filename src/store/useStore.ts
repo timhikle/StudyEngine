@@ -13,6 +13,7 @@ import {
 } from '../utils/schedule';
 import { parseSchedule, processAdjustment } from '../services/gemini';
 import { playTierAAlert, playTierBAlert, stopTierBAlert } from '../services/audio';
+import { BackgroundService } from '../services/background';
 
 const DEBOUNCE_MS = 2000;
 
@@ -105,6 +106,7 @@ export const useStore = create<AppState>((set, get) => ({
       const newRemaining = state.bigBreakTimeRemaining - 1;
       if (newRemaining <= 0) {
         playTierBAlert();
+        BackgroundService.stop();
         set({
           bigBreakTimeRemaining: 0,
           isRunning: false,
@@ -115,12 +117,14 @@ export const useStore = create<AppState>((set, get) => ({
         return;
       }
       set({ bigBreakTimeRemaining: newRemaining, version: state.version + 1 });
+      BackgroundService.updateRemaining(newRemaining);
       return;
     }
 
     const newRemaining = state.timeRemaining - 1;
     if (newRemaining > 0) {
       set({ timeRemaining: newRemaining, version: state.version + 1 });
+      BackgroundService.updateRemaining(newRemaining);
       return;
     }
 
@@ -169,14 +173,18 @@ export const useStore = create<AppState>((set, get) => ({
   startTimer: () => {
     const state = get();
     if (state.schedule.length === 0) return;
+    const timerType = state.activeTimerType || 'phase_intervals';
+    const totalSec = timerType === 'big_break' ? state.bigBreakTimeRemaining : state.timeRemaining;
     set({
       isRunning: true,
-      activeTimerType: state.activeTimerType || 'phase_intervals',
+      activeTimerType: timerType,
     });
+    BackgroundService.start(totalSec, timerType);
   },
 
   pauseTimer: () => {
     set({ isRunning: false });
+    BackgroundService.stop();
   },
 
   dismissAlert: () => {
@@ -197,8 +205,8 @@ export const useStore = create<AppState>((set, get) => ({
           bigBreakTimeRemaining: BIG_BREAK_DURATION * 60,
           version: state.version + 1,
         });
+        BackgroundService.start(BIG_BREAK_DURATION * 60, 'big_break');
       } else {
-        // No Big Break — go to next phase or finish
         const nextPhaseIdx = state.currentPhaseIndex + 1;
         const nextPhase = state.schedule.find(
           (b) => b.type === 'phase' && b.phaseIndex === nextPhaseIdx
@@ -216,6 +224,7 @@ export const useStore = create<AppState>((set, get) => ({
             tierBType: null,
             version: state.version + 1,
           });
+          BackgroundService.start(STUDY_DURATION * 60, 'phase_intervals');
         } else {
           set({
             tierBAlert: false,
@@ -224,6 +233,7 @@ export const useStore = create<AppState>((set, get) => ({
             activeTimerType: null,
             version: state.version + 1,
           });
+          BackgroundService.stop();
         }
       }
       return;
@@ -247,6 +257,7 @@ export const useStore = create<AppState>((set, get) => ({
           tierBType: null,
           version: state.version + 1,
         });
+        BackgroundService.start(STUDY_DURATION * 60, 'phase_intervals');
       } else {
         set({
           tierBAlert: false,
@@ -255,6 +266,7 @@ export const useStore = create<AppState>((set, get) => ({
           activeTimerType: null,
           version: state.version + 1,
         });
+        BackgroundService.stop();
       }
       return;
     }
@@ -283,6 +295,37 @@ export const useStore = create<AppState>((set, get) => ({
 
   addStudiedSeconds: (seconds: number) => {
     set((s) => ({ totalStudiedSeconds: s.totalStudiedSeconds + seconds, version: s.version + 1 }));
+  },
+
+  syncFromService: async () => {
+    const state = get();
+    const serviceState = await BackgroundService.getState();
+    if (serviceState?.isRunning && !state.isRunning && !state.tierBAlert) {
+      set({
+        isRunning: true,
+        activeTimerType: serviceState.timerType as any,
+        timeRemaining: serviceState.timerType === 'phase_intervals' ? serviceState.remainingSeconds : state.timeRemaining,
+        bigBreakTimeRemaining: serviceState.timerType === 'big_break' ? serviceState.remainingSeconds : state.bigBreakTimeRemaining,
+        version: state.version + 1,
+      });
+    }
+    BackgroundService.setCallbacks(
+      (data) => {
+        const cur = get();
+        if (data.timerType === 'big_break') {
+          set({ bigBreakTimeRemaining: data.remainingSeconds, isRunning: data.isRunning, version: cur.version + 1 });
+        } else {
+          set({ timeRemaining: data.remainingSeconds, isRunning: data.isRunning, version: cur.version + 1 });
+        }
+      },
+      () => {
+        const cur = get();
+        if (!cur.tierBAlert) {
+          playTierBAlert();
+          set({ isRunning: false, tierBAlert: true, tierBType: cur.activeTimerType === 'big_break' ? 'big_break_end' : 'phase_end', version: cur.version + 1 });
+        }
+      }
+    );
   },
 
   extendBreak: (phaseIndex: number, minutes: number) => {
