@@ -24,6 +24,12 @@ jobs:
         with:
           node-version: 22
 
+      - name: Inject Gemini API key
+        run: |
+          cat > src/config.ts << 'EOF'
+          export const GEMINI_API_KEY = '${{ secrets.GEMINI_API_KEY }}';
+          EOF
+
       - name: Install npm dependencies
         run: npm install
 

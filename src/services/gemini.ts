@@ -1,7 +1,8 @@
 import { ParsedSchedule, ScheduleBlock } from '../types';
 import { parseTimeString, getNowISO } from '../utils/time';
+import { GEMINI_API_KEY } from '../config';
 
-let apiKey = process.env.GEMINI_API_KEY || '';
+let apiKey = GEMINI_API_KEY;
 export function setGeminiApiKey(key: string) { apiKey = key; }
 
 const SYSTEM_PROMPT = `You are a multilingual schedule parser. Accept input in ANY language (English, Arabic, Urdu, French, etc.).
