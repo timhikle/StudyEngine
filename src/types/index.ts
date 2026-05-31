@@ -58,9 +58,12 @@ export interface AppState {
 
   setConsoleInput: (input: string) => void;
   sendConsoleCommand: (input: string) => Promise<void>;
-  tick: () => void;
+  handleIntervalComplete: () => void;
+  onNativeTick: (remainingSeconds: number) => void;
+  onNativeComplete: () => void;
   startTimer: () => void;
   pauseTimer: () => void;
+  resumeTimer: () => void;
   dismissAlert: () => void;
   updateSchedule: (phases: ScheduleBlock[]) => void;
   extendBreak: (phaseIndex: number, minutes: number) => void;

@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../theme';
 import { useStore } from '../store/useStore';
+import { BIG_BREAK_DURATION } from '../utils/schedule';
 import { TimerDisplay } from '../components/TimerDisplay';
 import { ProgressRing } from '../components/ProgressRing';
 
@@ -15,17 +16,6 @@ export const HomeScreen: React.FC = () => {
   const activeTimerType = useStore((s) => s.activeTimerType);
   const startTimer = useStore((s) => s.startTimer);
   const pauseTimer = useStore((s) => s.pauseTimer);
-  const tick = useStore((s) => s.tick);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const state = useStore.getState();
-      if (state.isRunning && !state.tierBAlert) {
-        state.tick();
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   const isBigBreak = activeTimerType === 'big_break';
   const isPhaseIntervals = activeTimerType === 'phase_intervals';
@@ -119,8 +109,6 @@ export const HomeScreen: React.FC = () => {
     </SafeAreaView>
   );
 };
-
-const BIG_BREAK_DURATION = 30;
 
 const styles = StyleSheet.create({
   safe: {

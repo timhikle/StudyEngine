@@ -7,9 +7,14 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
+import com.facebook.react.ReactApplication
+import com.facebook.react.bridge.ReactContext
+import com.facebook.react.modules.core.DeviceEventManagerModule
 
 class TimerService : Service() {
   companion object {
@@ -18,9 +23,12 @@ class TimerService : Service() {
     var isRunning = false
       private set
     var remainingSeconds = 0
+      private set
     var activeTimerType = ""
+      private set
   }
 
+  private val handler = Handler(Looper.getMainLooper())
   private var wakeLock: PowerManager.WakeLock? = null
 
   override fun onCreate() {
@@ -31,16 +39,29 @@ class TimerService : Service() {
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     when (intent?.action) {
       "START" -> {
-        remainingSeconds = intent.getIntExtra("totalSeconds", 0)
-        activeTimerType = intent.getStringExtra("timerType") ?: ""
+        remainingSeconds = intent.getIntExtra("totalSeconds", 60)
+        activeTimerType = intent.getStringExtra("timerType") ?: "phase_intervals"
         startForeground(NOTIFICATION_ID, buildNotification())
         isRunning = true
         acquireWakeLock()
+        startTicking()
       }
       "STOP" -> {
+        stopTicking()
+        isRunning = false
         stopSelf()
       }
-      "UPDATE" -> {
+      "PAUSE" -> {
+        stopTicking()
+        isRunning = false
+        updateNotification()
+      }
+      "RESUME" -> {
+        isRunning = true
+        startTicking()
+        updateNotification()
+      }
+      "SET_REMAINING" -> {
         remainingSeconds = intent.getIntExtra("remainingSeconds", remainingSeconds)
         updateNotification()
       }
@@ -51,10 +72,40 @@ class TimerService : Service() {
   override fun onBind(intent: Intent?): IBinder? = null
 
   override fun onDestroy() {
+    stopTicking()
     isRunning = false
     releaseWakeLock()
+    stopRingtone()
     stopForeground(STOP_FOREGROUND_REMOVE)
     super.onDestroy()
+  }
+
+  private fun startTicking() {
+    handler.post(object : Runnable {
+      override fun run() {
+        if (!isRunning) return
+        if (remainingSeconds <= 0) {
+          onTimerComplete()
+          return
+        }
+        remainingSeconds--
+        updateNotification()
+        emitEvent("onTimerTick", remainingSeconds)
+        handler.postDelayed(this, 1000)
+      }
+    })
+  }
+
+  private fun stopTicking() {
+    handler.removeCallbacksAndMessages(null)
+  }
+
+  private fun onTimerComplete() {
+    isRunning = false
+    stopTicking()
+    releaseWakeLock()
+    emitEvent("onTimerComplete", 0)
+    updateNotification()
   }
 
   private fun updateNotification() {
@@ -66,7 +117,7 @@ class TimerService : Service() {
     val min = remainingSeconds / 60
     val sec = remainingSeconds % 60
     val timeStr = String.format("%02d:%02d", min, sec)
-    val label = if (activeTimerType == "big_break") "Big Break" else "Study"
+    val label = if (activeTimerType == "big_break") "Big Break" else "Study Phase"
 
     val intent = packageManager.getLaunchIntentForPackage(packageName)
     val pendingIntent = PendingIntent.getActivity(
@@ -76,7 +127,7 @@ class TimerService : Service() {
 
     return NotificationCompat.Builder(this, CHANNEL_ID)
       .setContentTitle("Phase Study - $label")
-      .setContentText("Remaining: $timeStr")
+      .setContentText("$timeStr remaining")
       .setSmallIcon(com.studyengine.R.mipmap.ic_launcher)
       .setOngoing(true)
       .setContentIntent(pendingIntent)
@@ -89,7 +140,7 @@ class TimerService : Service() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       val channel = NotificationChannel(
         CHANNEL_ID, "Timer Service",
-        NotificationManager.IMPORTANCE_HIGH
+        NotificationManager.IMPORTANCE_LOW
       ).apply {
         description = "Shows timer progress in background"
         setShowBadge(false)
@@ -114,5 +165,21 @@ class TimerService : Service() {
       if (it.isHeld) it.release()
     }
     wakeLock = null
+  }
+
+  private fun getReactContext(): ReactContext? {
+    return try {
+      val app = applicationContext as ReactApplication
+      app.reactHost?.currentReactContext
+    } catch (_: Exception) { null }
+  }
+
+  private fun emitEvent(name: String, data: Any) {
+    val reactContext = getReactContext() ?: return
+    try {
+      reactContext
+        .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+        .emit(name, data)
+    } catch (_: Exception) {}
   }
 }

@@ -1,13 +1,28 @@
 package com.studyengine
 
 import android.content.Intent
+import android.os.Build
+import com.facebook.react.bridge.Arguments
+import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
-import com.facebook.react.bridge.Promise
+import com.facebook.react.modules.core.DeviceEventManagerModule
 
 class TimerModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
   override fun getName(): String = "TimerModule"
+
+  private var hasListeners = false
+
+  @ReactMethod
+  fun addListener(eventName: String) {
+    hasListeners = true
+  }
+
+  @ReactMethod
+  fun removeListeners(count: Int) {
+    hasListeners = false
+  }
 
   @ReactMethod
   fun startTimer(totalSeconds: Int, timerType: String, promise: Promise) {
@@ -18,7 +33,7 @@ class TimerModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
         putExtra("totalSeconds", totalSeconds)
         putExtra("timerType", timerType)
       }
-      if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         ctx.startForegroundService(intent)
       } else {
         ctx.startService(intent)
@@ -32,8 +47,9 @@ class TimerModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
   @ReactMethod
   fun stopTimer(promise: Promise) {
     try {
-      val ctx = reactApplicationContext
-      ctx.stopService(Intent(ctx, TimerService::class.java))
+      reactApplicationContext.startService(
+        Intent(reactApplicationContext, TimerService::class.java).apply { action = "STOP" }
+      )
       promise.resolve(true)
     } catch (e: Exception) {
       promise.reject("TIMER_ERROR", e.message)
@@ -41,13 +57,38 @@ class TimerModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
   }
 
   @ReactMethod
-  fun updateRemaining(seconds: Int, promise: Promise) {
+  fun pauseTimer(promise: Promise) {
     try {
-      val ctx = reactApplicationContext
-      ctx.startService(Intent(ctx, TimerService::class.java).apply {
-        action = "UPDATE"
-        putExtra("remainingSeconds", seconds)
-      })
+      reactApplicationContext.startService(
+        Intent(reactApplicationContext, TimerService::class.java).apply { action = "PAUSE" }
+      )
+      promise.resolve(true)
+    } catch (e: Exception) {
+      promise.reject("TIMER_ERROR", e.message)
+    }
+  }
+
+  @ReactMethod
+  fun resumeTimer(promise: Promise) {
+    try {
+      reactApplicationContext.startService(
+        Intent(reactApplicationContext, TimerService::class.java).apply { action = "RESUME" }
+      )
+      promise.resolve(true)
+    } catch (e: Exception) {
+      promise.reject("TIMER_ERROR", e.message)
+    }
+  }
+
+  @ReactMethod
+  fun setRemaining(seconds: Int, promise: Promise) {
+    try {
+      reactApplicationContext.startService(
+        Intent(reactApplicationContext, TimerService::class.java).apply {
+          action = "SET_REMAINING"
+          putExtra("remainingSeconds", seconds)
+        }
+      )
       promise.resolve(true)
     } catch (e: Exception) {
       promise.reject("TIMER_ERROR", e.message)
@@ -61,7 +102,7 @@ class TimerModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
 
   @ReactMethod
   fun getServiceState(promise: Promise) {
-    val map = com.facebook.react.bridge.Arguments.createMap()
+    val map = Arguments.createMap()
     map.putBoolean("isRunning", TimerService.isRunning)
     map.putInt("remainingSeconds", TimerService.remainingSeconds)
     map.putString("timerType", TimerService.activeTimerType)
@@ -69,21 +110,11 @@ class TimerModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
   }
 
   @ReactMethod
-  fun playRingtone(promise: Promise) {
-    try {
-      val ctx = reactApplicationContext
-      ctx.startService(Intent(ctx, TimerService::class.java).apply { action = "PLAY_RINGTONE" })
-      promise.resolve(true)
-    } catch (e: Exception) {
-      promise.reject("AUDIO_ERROR", e.message)
-    }
-  }
-
-  @ReactMethod
   fun stopRingtone(promise: Promise) {
     try {
-      val ctx = reactApplicationContext
-      ctx.startService(Intent(ctx, TimerService::class.java).apply { action = "STOP_RINGTONE" })
+      reactApplicationContext.startService(
+        Intent(reactApplicationContext, TimerService::class.java).apply { action = "STOP_RINGTONE" }
+      )
       promise.resolve(true)
     } catch (e: Exception) {
       promise.reject("AUDIO_ERROR", e.message)

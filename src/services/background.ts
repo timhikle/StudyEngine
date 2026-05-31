@@ -1,6 +1,29 @@
-import { NativeModules, Platform } from 'react-native';
+import { NativeModules, NativeEventEmitter, Platform } from 'react-native';
 
 const { TimerModule } = NativeModules;
+let emitter: NativeEventEmitter | null = null;
+let tickCallback: ((seconds: number) => void) | null = null;
+let completeCallback: (() => void) | null = null;
+let listenerAttached = false;
+
+function ensureEmitter() {
+  if (!emitter && TimerModule && Platform.OS === 'android') {
+    emitter = new NativeEventEmitter(TimerModule);
+  }
+}
+
+function attachListeners() {
+  if (listenerAttached || !emitter) return;
+  listenerAttached = true;
+
+  emitter.addListener('onTimerTick', (remainingSeconds: number) => {
+    tickCallback?.(remainingSeconds);
+  });
+
+  emitter.addListener('onTimerComplete', () => {
+    completeCallback?.();
+  });
+}
 
 export const BackgroundService = {
   start: async (totalSeconds: number, timerType: string): Promise<boolean> => {
@@ -15,9 +38,21 @@ export const BackgroundService = {
     catch { return false; }
   },
 
-  updateRemaining: async (seconds: number): Promise<boolean> => {
-    if (Platform.OS !== 'android' || !TimerModule?.updateRemaining) return false;
-    try { await TimerModule.updateRemaining(seconds); return true; }
+  pause: async (): Promise<boolean> => {
+    if (Platform.OS !== 'android' || !TimerModule?.pauseTimer) return false;
+    try { await TimerModule.pauseTimer(); return true; }
+    catch { return false; }
+  },
+
+  resume: async (): Promise<boolean> => {
+    if (Platform.OS !== 'android' || !TimerModule?.resumeTimer) return false;
+    try { await TimerModule.resumeTimer(); return true; }
+    catch { return false; }
+  },
+
+  setRemaining: async (seconds: number): Promise<boolean> => {
+    if (Platform.OS !== 'android' || !TimerModule?.setRemaining) return false;
+    try { await TimerModule.setRemaining(seconds); return true; }
     catch { return false; }
   },
 
@@ -33,5 +68,16 @@ export const BackgroundService = {
     catch { return null; }
   },
 
-  setCallbacks: () => {},
+  stopRingtone: async (): Promise<boolean> => {
+    if (Platform.OS !== 'android' || !TimerModule?.stopRingtone) return false;
+    try { await TimerModule.stopRingtone(); return true; }
+    catch { return false; }
+  },
+
+  setCallbacks: (tick: ((s: number) => void) | null, complete: (() => void) | null) => {
+    tickCallback = tick;
+    completeCallback = complete;
+    ensureEmitter();
+    attachListeners();
+  },
 };

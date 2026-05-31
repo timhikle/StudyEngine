@@ -98,33 +98,19 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  tick: () => {
+  handleIntervalComplete: () => {
     const state = get();
-    if (!state.isRunning || state.tierBAlert) return;
+    if (state.tierBAlert) return;
 
     if (state.activeTimerType === 'big_break') {
-      const newRemaining = state.bigBreakTimeRemaining - 1;
-      if (newRemaining <= 0) {
-        playTierBAlert();
-        BackgroundService.stop();
-        set({
-          bigBreakTimeRemaining: 0,
-          isRunning: false,
-          tierBAlert: true,
-          tierBType: 'big_break_end',
-          version: state.version + 1,
-        });
-        return;
-      }
-      set({ bigBreakTimeRemaining: newRemaining, version: state.version + 1 });
-      BackgroundService.updateRemaining(newRemaining);
-      return;
-    }
-
-    const newRemaining = state.timeRemaining - 1;
-    if (newRemaining > 0) {
-      set({ timeRemaining: newRemaining, version: state.version + 1 });
-      BackgroundService.updateRemaining(newRemaining);
+      playTierBAlert();
+      set({
+        bigBreakTimeRemaining: 0,
+        isRunning: false,
+        tierBAlert: true,
+        tierBType: 'big_break_end',
+        version: state.version + 1,
+      });
       return;
     }
 
@@ -161,13 +147,28 @@ export const useStore = create<AppState>((set, get) => ({
     const nextIndex = state.currentIntervalIndex + 1;
     const nextInterval = intervals[nextIndex];
     nextInterval.status = 'active';
+    const nextDuration = nextInterval.duration * 60;
     set({
       intervals,
       currentIntervalIndex: nextIndex,
-      timeRemaining: nextInterval.duration * 60,
+      timeRemaining: nextDuration,
       totalStudiedSeconds: state.totalStudiedSeconds + added,
       version: state.version + 1,
     });
+    BackgroundService.start(nextDuration, state.activeTimerType!);
+  },
+
+  onNativeTick: (remainingSeconds: number) => {
+    const state = get();
+    if (state.activeTimerType === 'big_break') {
+      set({ bigBreakTimeRemaining: remainingSeconds, version: state.version + 1 });
+    } else {
+      set({ timeRemaining: remainingSeconds, version: state.version + 1 });
+    }
+  },
+
+  onNativeComplete: () => {
+    get().handleIntervalComplete();
   },
 
   startTimer: () => {
@@ -175,16 +176,18 @@ export const useStore = create<AppState>((set, get) => ({
     if (state.schedule.length === 0) return;
     const timerType = state.activeTimerType || 'phase_intervals';
     const totalSec = timerType === 'big_break' ? state.bigBreakTimeRemaining : state.timeRemaining;
-    set({
-      isRunning: true,
-      activeTimerType: timerType,
-    });
+    set({ isRunning: true, activeTimerType: timerType });
     BackgroundService.start(totalSec, timerType);
   },
 
   pauseTimer: () => {
     set({ isRunning: false });
-    BackgroundService.stop();
+    BackgroundService.pause();
+  },
+
+  resumeTimer: () => {
+    set({ isRunning: true });
+    BackgroundService.resume();
   },
 
   dismissAlert: () => {
@@ -310,21 +313,8 @@ export const useStore = create<AppState>((set, get) => ({
       });
     }
     BackgroundService.setCallbacks(
-      (data) => {
-        const cur = get();
-        if (data.timerType === 'big_break') {
-          set({ bigBreakTimeRemaining: data.remainingSeconds, isRunning: data.isRunning, version: cur.version + 1 });
-        } else {
-          set({ timeRemaining: data.remainingSeconds, isRunning: data.isRunning, version: cur.version + 1 });
-        }
-      },
-      () => {
-        const cur = get();
-        if (!cur.tierBAlert) {
-          playTierBAlert();
-          set({ isRunning: false, tierBAlert: true, tierBType: cur.activeTimerType === 'big_break' ? 'big_break_end' : 'phase_end', version: cur.version + 1 });
-        }
-      }
+      (remainingSeconds) => get().onNativeTick(remainingSeconds),
+      () => get().onNativeComplete()
     );
   },
 
