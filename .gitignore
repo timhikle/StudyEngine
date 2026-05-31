@@ -1,0 +1,12 @@
+node_modules/
+.gradle/
+build/
+*.apk
+*.aab
+local.properties
+*.iml
+.idea/
+*.hprof
+.cxx/
+*.keystore
+!android/app/debug.keystore
