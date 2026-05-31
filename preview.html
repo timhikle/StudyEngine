@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Phase Study — Preview</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0b1120; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+  .phone { width: 393px; height: 852px; background: #0f172a; border-radius: 44px; overflow: hidden; box-shadow: 0 0 80px rgba(45,212,191,0.06); position: relative; display: flex; flex-direction: column; border: 1px solid #1e293b; }
+  .status-bar { padding: 14px 24px 8px; display: flex; justify-content: space-between; color: #94a3b8; font-size: 13px; font-weight: 600; }
+  .screen { flex: 1; overflow-y: auto; padding: 16px; }
+  .screen::-webkit-scrollbar { display: none; }
+  .tab-bar { display: flex; background: #1e293b; border-top: 1px solid #334155; padding: 8px 0 24px; }
+  .tab { flex: 1; text-align: center; cursor: pointer; padding: 4px 0; transition: opacity 0.2s; }
+  .tab:hover { opacity: 0.8; }
+  .tab.active .tab-icon { color: #2dd4bf; }
+  .tab.active .tab-label { color: #2dd4bf; }
+  .tab-icon { font-size: 22px; color: #94a3b8; margin-bottom: 2px; }
+  .tab-label { font-size: 11px; color: #94a3b8; font-weight: 500; }
+  .hidden { display: none !important; }
+
+  .header { display: flex; justify-content: space-between; align-items: center; padding: 8px 0 16px; }
+  .header h1 { color: #f8fafc; font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+  .header .v { color: #94a3b8; font-size: 14px; }
+
+  .timer-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 20px 0; }
+  .ring-container { width: 260px; height: 260px; position: relative; display: flex; align-items: center; justify-content: center; }
+  .ring-svg { position: absolute; transform: rotate(-90deg); }
+  .ring-inner { width: 236px; height: 236px; border-radius: 50%; background: #0f172a; position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1; }
+  .interval-label { color: #94a3b8; font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
+  .timer-text { color: #f8fafc; font-size: 60px; font-weight: 300; letter-spacing: 3px; font-variant-numeric: tabular-nums; }
+  .timer-text.warning { color: #ef4444; }
+  .status-focus { color: #2dd4bf; font-size: 14px; letter-spacing: 4px; margin-top: 8px; font-weight: 500; }
+  .btn-row { display: flex; gap: 16px; margin-top: 32px; }
+  .btn { padding: 14px 48px; border-radius: 999px; font-size: 15px; font-weight: 700; letter-spacing: 2px; cursor: pointer; border: none; transition: all 0.2s; }
+  .btn:hover { transform: scale(1.02); }
+  .btn:active { transform: scale(0.97); }
+  .btn-outline { background: transparent; border: 1px solid #334155; color: #f8fafc; }
+  .btn-primary { background: #2dd4bf; color: #0f172a; }
+  .interval-info { text-align: center; margin-top: 16px; }
+  .interval-info p { color: #94a3b8; font-size: 14px; margin-bottom: 4px; }
+  .interval-info small { color: #94a3b8; font-size: 12px; opacity: 0.7; }
+
+  .console-card { background: #1e293b; border-radius: 16px; padding: 16px; border: 1px solid #334155; margin-bottom: 16px; }
+  .console-header { display: flex; align-items: center; margin-bottom: 12px; }
+  .console-header h3 { color: #2dd4bf; font-size: 15px; font-weight: 600; margin-right: 8px; }
+  .console-dot { width: 6px; height: 6px; border-radius: 3px; background: #2dd4bf; margin-right: 4px; animation: pulse-dot 2s infinite; }
+  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .console-model { color: #94a3b8; font-size: 11px; }
+  .console-input { display: flex; gap: 8px; }
+  .console-input input { flex: 1; background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 12px 16px; color: #f8fafc; font-size: 14px; outline: none; transition: border-color 0.2s; }
+  .console-input input:focus { border-color: #2dd4bf; }
+  .console-input input::placeholder { color: #94a3b8; }
+  .console-send { width: 44px; height: 44px; border-radius: 12px; background: #2dd4bf; border: none; cursor: pointer; font-size: 20px; color: #0f172a; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s; }
+  .console-send:disabled { opacity: 0.4; cursor: not-allowed; }
+  .console-send:hover:not(:disabled) { opacity: 0.9; }
+  .console-hint { margin-top: 8px; font-size: 12px; color: #94a3b8; opacity: 0.7; }
+  .console-error { background: rgba(239,68,68,0.12); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; color: #ef4444; font-size: 13px; display: none; }
+
+  .section-title { color: #94a3b8; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
+
+  .phase-card { display: flex; flex-direction: column; gap: 4px; background: #1e293b; border-radius: 12px; padding: 16px; border-left: 3px solid #334155; margin-bottom: 8px; transition: all 0.3s; }
+  .phase-card.active { border-left-color: #2dd4bf; box-shadow: 0 0 20px rgba(45,212,191,0.1); }
+  .phase-card.done { border-left-color: #22c55e; opacity: 0.6; }
+  .phase-row { display: flex; justify-content: space-between; align-items: center; }
+  .phase-label { color: #f8fafc; font-size: 15px; font-weight: 600; }
+  .phase-label.active-label { color: #2dd4bf; }
+  .phase-badge { padding: 2px 10px; border-radius: 6px; font-size: 10px; font-weight: 700; letter-spacing: 1px; color: #0f172a; background: #334155; }
+  .phase-badge.active-badge { background: #2dd4bf; }
+  .phase-badge.done-badge { background: #22c55e; }
+  .phase-time { color: #94a3b8; font-size: 13px; }
+  .phase-dur { color: #94a3b8; font-size: 13px; }
+
+  .break-card { display: flex; align-items: center; gap: 12px; background: #1e293b; border-radius: 12px; padding: 16px; border-left: 3px solid #334155; margin-bottom: 8px; opacity: 0.85; transition: all 0.3s; }
+  .break-card.active { border-left-color: #eab308; opacity: 1; box-shadow: 0 0 16px rgba(234,179,8,0.1); }
+  .break-icon { width: 36px; height: 36px; border-radius: 18px; background: #334155; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .break-content { flex: 1; }
+  .break-label { color: #94a3b8; font-size: 15px; font-weight: 600; }
+  .break-label.active-b { color: #eab308; }
+  .break-time { color: #94a3b8; font-size: 13px; }
+  .break-dur { color: #94a3b8; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; margin-top: 2px; }
+  .break-dot { width: 10px; height: 10px; border-radius: 5px; background: #334155; flex-shrink: 0; }
+  .break-dot.active-dot { background: #eab308; }
+
+  .stats-row { display: flex; gap: 8px; margin-bottom: 20px; }
+  .stat-card { flex: 1; background: #1e293b; border-radius: 12px; padding: 16px; text-align: center; }
+  .stat-num { color: #2dd4bf; font-size: 28px; font-weight: 700; }
+  .stat-label { color: #94a3b8; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-top: 4px; }
+
+  .alert-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
+  .alert-card { background: #1e293b; border-radius: 24px; padding: 32px; width: 85%; text-align: center; border: 1px solid rgba(239,68,68,0.25); animation: alert-in 0.3s ease; }
+  @keyframes alert-in { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .alert-icon { width: 64px; height: 64px; border-radius: 32px; background: rgba(239,68,68,0.12); margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; }
+  .alert-dot-inner { width: 24px; height: 24px; border-radius: 12px; background: #ef4444; animation: alert-pulse 1s infinite; }
+  @keyframes alert-pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.2)} }
+  .alert-title { color: #ef4444; font-size: 26px; font-weight: 700; letter-spacing: 2px; margin-bottom: 8px; }
+  .alert-desc { color: #94a3b8; font-size: 15px; line-height: 22px; margin-bottom: 24px; }
+  .alert-btn { width: 100%; padding: 14px; border-radius: 12px; font-size: 15px; font-weight: 700; letter-spacing: 1px; cursor: pointer; border: none; margin-bottom: 6px; transition: all 0.2s; }
+  .alert-btn:hover { transform: scale(1.01); }
+  .alert-btn:active { transform: scale(0.98); }
+  .alert-btn-dismiss { background: #2dd4bf; color: #0f172a; }
+  .alert-btn-finish { background: transparent; border: 1px solid #ef4444; color: #ef4444; }
+
+  .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #0f172a; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="phone" id="app">
+  <div class="status-bar">
+    <span>9:41</span>
+    <span>📶 🔋 91%</span>
+  </div>
+
+  <!-- STUDY SCREEN -->
+  <div class="screen" id="screen-study">
+    <div class="header">
+      <h1>Phase Study</h1>
+      <span class="v">v1.0</span>
+    </div>
+
+    <div class="timer-wrap">
+      <div class="ring-container">
+        <svg class="ring-svg" width="260" height="260" viewBox="0 0 260 260">
+          <circle cx="130" cy="130" r="118" fill="none" stroke="#334155" stroke-width="8"/>
+          <circle id="progress-circle" cx="130" cy="130" r="118" fill="none" stroke="#2dd4bf" stroke-width="8"
+            stroke-linecap="round" stroke-dasharray="741" stroke-dashoffset="0"
+            style="transition: stroke-dashoffset 0.4s ease, stroke 0.3s ease"/>
+        </svg>
+        <div class="ring-inner">
+          <div class="interval-label" id="interval-label">STUDY</div>
+          <div class="timer-text" id="timer-display">25:00</div>
+          <div class="status-focus" id="status-focus">READY</div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-pause" onclick="toggleTimer()" style="display:none">PAUSE</button>
+        <button class="btn btn-primary" id="btn-start" onclick="startSession()">START</button>
+      </div>
+
+      <div class="interval-info">
+        <p id="interval-counter">Set a schedule from the Console</p>
+        <small id="phase-counter"></small>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONSOLE SCREEN -->
+  <div class="screen hidden" id="screen-console">
+    <div class="header">
+      <h1>Console</h1>
+      <span style="display:flex;align-items:center;gap:4px">
+        <span style="width:8px;height:8px;border-radius:4px;background:#2dd4bf;animation:pulse-dot 2s infinite"></span>
+        <span style="color:#2dd4bf;font-size:12px">Gemini Online</span>
+      </span>
+    </div>
+
+    <div class="console-card">
+      <div class="console-header">
+        <h3>AI Console</h3>
+        <span class="console-dot"></span>
+        <span class="console-model">Gemini 2.5 Flash-Lite</span>
+      </div>
+      <div class="console-error" id="console-error"></div>
+      <div class="console-input">
+        <input type="text" id="console-input" placeholder="I want to study from 3:00 PM to 7:00 PM" onkeydown="if(event.key==='Enter') sendCommand()">
+        <button class="console-send" id="console-send-btn" onclick="sendCommand()">→</button>
+      </div>
+        <div class="console-hint">🗓 "أدرس من 8 لل 12" ⏱ "مدد 10 دقائق" 📊 "تقرير" 🗑 "حذف"</div>
+        <div style="display:flex;gap:6px;padding:8px 16px 4px;align-items:center">
+          <input id="api-key-input" type="password" placeholder="Gemini API Key (optional)" style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:6px 10px;color:#f8fafc;font-size:11px;outline:none">
+          <button onclick="saveApiKey()" style="background:transparent;border:1px solid #2dd4bf;color:#2dd4bf;border-radius:8px;padding:6px 12px;font-size:11px;cursor:pointer;font-weight:600">SAVE</button>
+        </div>
+    </div>
+
+    <div class="section-title">Schedule Timeline</div>
+    <div id="timeline-container">
+      <div style="text-align:center;padding:40px 20px;color:#94a3b8">
+        <p style="font-size:18px;font-weight:600;margin-bottom:8px">No schedule yet</p>
+        <p style="font-size:14px;opacity:0.7">Use the AI Console above to set your study schedule</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCHEDULE SCREEN -->
+  <div class="screen hidden" id="screen-schedule">
+    <div class="header">
+      <h1>Schedule</h1>
+      <button class="btn btn-small btn-danger" id="btn-clear" onclick="clearSchedule()" style="display:none;padding:6px 14px;font-size:12px;border-radius:8px;background:transparent;border:1px solid #ef4444;color:#ef4444;cursor:pointer">🗑 مسح</button>
+    </div>
+
+    <!-- Weekly Report Card -->
+    <div id="report-card" style="display:none;background:linear-gradient(135deg,#1e293b,#0f172a);border-radius:16px;padding:20px;margin-bottom:16px;border:1px solid #334155">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="color:#94a3b8;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase">📊 التقرير الأسبوعي</span>
+        <span style="color:#94a3b8;font-size:11px">Weekly Report</span>
+      </div>
+      <div style="display:flex;gap:12px">
+        <div style="flex:1;text-align:center;background:rgba(45,212,191,0.08);border-radius:12px;padding:16px">
+          <div style="color:#2dd4bf;font-size:32px;font-weight:700" id="report-hours">0</div>
+          <div style="color:#94a3b8;font-size:11px;letter-spacing:1px;margin-top:4px">ساعات الدراسة</div>
+          <div style="color:#64748b;font-size:10px">Hours Studied</div>
+        </div>
+        <div style="flex:1;text-align:center;background:rgba(45,212,191,0.08);border-radius:12px;padding:16px">
+          <div style="color:#2dd4bf;font-size:32px;font-weight:700" id="report-sessions">0</div>
+          <div style="color:#94a3b8;font-size:11px;letter-spacing:1px;margin-top:4px">الجلسات المكتملة</div>
+          <div style="color:#64748b;font-size:10px">Sessions Done</div>
+        </div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button onclick="clearSchedule()" style="flex:1;padding:8px;border-radius:8px;border:1px solid #ef4444;background:transparent;color:#ef4444;font-size:12px;font-weight:600;cursor:pointer">حذف الجدول</button>
+      </div>
+    </div>
+
+    <div class="stats-row" id="stats-row" style="display:none">
+      <div class="stat-card"><div class="stat-num" id="stat-phases">0</div><div class="stat-label">Phases</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-minutes">0</div><div class="stat-label">Study Min</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-breaks">0</div><div class="stat-label">Breaks</div></div>
+    </div>
+
+    <div class="section-title">Timeline</div>
+    <div id="schedule-timeline">
+      <div style="text-align:center;padding:40px 20px;color:#94a3b8">
+        <p style="font-size:18px;font-weight:600;margin-bottom:8px">No schedule yet</p>
+        <p style="font-size:14px;opacity:0.7">Use the AI Console to set your study schedule</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- TIER B ALERT OVERLAY -->
+  <div class="alert-overlay hidden" id="alert-overlay">
+    <div class="alert-card">
+      <div class="alert-icon"><div class="alert-dot-inner"></div></div>
+      <div class="alert-title" id="alert-title">PHASE COMPLETE</div>
+      <div class="alert-desc" id="alert-desc">Your study phase has finished.</div>
+      <button class="alert-btn alert-btn-dismiss" onclick="dismissAlert()">DISMISS</button>
+      <button class="alert-btn alert-btn-finish" onclick="finishEarly()">FINISH EARLY</button>
+    </div>
+  </div>
+
+  <!-- TAB BAR -->
+  <div class="tab-bar">
+    <div class="tab active" onclick="switchTab('study')" id="tab-study">
+      <div class="tab-icon">◉</div>
+      <div class="tab-label">Study</div>
+    </div>
+    <div class="tab" onclick="switchTab('console')" id="tab-console">
+      <div class="tab-icon">▶</div>
+      <div class="tab-label">Console</div>
+    </div>
+    <div class="tab" onclick="switchTab('schedule')" id="tab-schedule">
+      <div class="tab-icon">☰</div>
+      <div class="tab-label">Schedule</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== GEMINI API ====================
+const GEMINI_API_KEY = localStorage.getItem('gemini_api_key') || '';
+const GEMINI_MODEL = 'gemini-2.5-flash-lite';
+
+async function callGemini(prompt) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        role: 'user',
+        parts: [{ text: prompt }]
+      }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 1024 }
+    })
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  const data = await res.json();
+  return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+// ==================== STATE ====================
+const state = {
+  schedule: [],
+  currentPhaseIdx: 0,
+  intervalIdx: 0,
+  timeRemaining: 25 * 60,
+  isRunning: false,
+  activeTimerType: null,
+  tierBAlert: false,
+  tierBType: null,
+  intervals: [],
+  consoleInput: '',
+  isSending: false,
+  totalStudiedSeconds: 0,
+  sessionHistory: [],
+};
+
+const PHASE_MIN = 120, BIG_BREAK_MIN = 30, STUDY_MIN = 25, SHORT_BREAK_MIN = 5, INTERVALS_PER_PHASE = 4;
+
+// ==================== TIMER ====================
+let timerInterval = null;
+
+function genIntervals() {
+  const arr = [];
+  for (let i = 0; i < INTERVALS_PER_PHASE; i++) {
+    arr.push({ type: 'study', duration: STUDY_MIN, status: i === 0 ? 'active' : 'pending' });
+    if (i < INTERVALS_PER_PHASE - 1) arr.push({ type: 'short_break', duration: SHORT_BREAK_MIN, status: 'pending' });
+  }
+  return arr;
+}
+
+function startSession() {
+  if (!state.schedule.length) {
+    if (document.getElementById('console-input').value.trim()) {
+      switchTab('console');
+      sendCommand();
+      return;
+    }
+    showError('Set a schedule from the Console first!');
+    switchTab('console');
+    return;
+  }
+  state.intervals = genIntervals();
+  state.intervalIdx = 0;
+  state.timeRemaining = STUDY_MIN * 60;
+  state.isRunning = true;
+  state.activeTimerType = 'phase_intervals';
+  document.getElementById('btn-start').style.display = 'none';
+  document.getElementById('btn-pause').style.display = '';
+  startTick();
+  render();
+}
+
+function toggleTimer() {
+  if (state.isRunning) { state.isRunning = false; stopTick(); document.getElementById('btn-pause').textContent = 'RESUME'; }
+  else { state.isRunning = true; startTick(); document.getElementById('btn-pause').textContent = 'PAUSE'; }
+  document.getElementById('status-focus').textContent = state.isRunning ? 'FOCUS' : 'PAUSED';
+}
+
+function startTick() { stopTick(); timerInterval = setInterval(tick, 1000); }
+function stopTick() { if (timerInterval) { clearInterval(timerInterval); timerInterval = null; } }
+
+function tick() {
+  if (!state.isRunning || state.tierBAlert) return;
+  state.timeRemaining--;
+  if (state.timeRemaining > 0) { render(); return; }
+
+  const cur = state.intervals[state.intervalIdx];
+  if (cur) {
+    cur.status = 'completed';
+    if (cur.type === 'study') state.totalStudiedSeconds += cur.duration * 60;
+  }
+
+  if (state.intervalIdx >= state.intervals.length - 1) {
+    state.sessionHistory.push({ phaseIdx: state.currentPhaseIdx, completedAt: new Date().toISOString() });
+    showTierB('phase_end');
+    return;
+  }
+
+  flashTierA();
+  state.intervalIdx++;
+  state.intervals[state.intervalIdx].status = 'active';
+  state.timeRemaining = state.intervals[state.intervalIdx].duration * 60;
+  render();
+}
+
+function flashTierA() {
+  const c = document.getElementById('progress-circle');
+  c.style.stroke = '#f8fafc';
+  setTimeout(() => { c.style.stroke = '#2dd4bf'; }, 200);
+}
+
+function showTierB(type) {
+  state.tierBAlert = true;
+  state.tierBType = type;
+  state.isRunning = false;
+  stopTick();
+  document.getElementById('alert-overlay').classList.remove('hidden');
+  document.getElementById('alert-title').textContent = type === 'phase_end' ? 'PHASE COMPLETE' : 'BREAK ENDED';
+  document.getElementById('alert-desc').textContent = type === 'phase_end'
+    ? 'Your study phase has finished. Time for a Big Break!'
+    : 'Your Big Break is over. Ready for the next phase?';
+}
+
+function dismissAlert() {
+  document.getElementById('alert-overlay').classList.add('hidden');
+  state.tierBAlert = false;
+
+  if (state.tierBType === 'phase_end') {
+    // Check if there's a Big Break after this phase
+    const hasBB = state.schedule.some(b => b.type === 'big_break' && b.phaseIndex === state.currentPhaseIdx);
+    if (hasBB) {
+      state.activeTimerType = 'big_break';
+      state.timeRemaining = BIG_BREAK_MIN * 60;
+      state.isRunning = true;
+      startTick();
+    } else {
+      const next = state.currentPhaseIdx + 1;
+      const nextPhase = state.schedule.find(b => b.type === 'phase' && b.phaseIndex === next);
+      if (nextPhase) {
+        state.currentPhaseIdx = next;
+        state.intervals = genIntervals();
+        state.intervalIdx = 0;
+        state.timeRemaining = STUDY_MIN * 60;
+        state.activeTimerType = 'phase_intervals';
+        state.isRunning = true;
+        startTick();
+      } else {
+        state.activeTimerType = null;
+        document.getElementById('btn-pause').style.display = 'none';
+        document.getElementById('btn-start').style.display = '';
+      }
+    }
+  } else {
+    const next = state.currentPhaseIdx + 1;
+    const nextPhase = state.schedule.find(b => b.type === 'phase' && b.phaseIndex === next);
+    if (nextPhase) {
+      state.currentPhaseIdx = next;
+      state.intervals = genIntervals();
+      state.intervalIdx = 0;
+      state.timeRemaining = STUDY_MIN * 60;
+      state.activeTimerType = 'phase_intervals';
+      state.isRunning = true;
+      startTick();
+    } else {
+      state.activeTimerType = null;
+      document.getElementById('btn-pause').style.display = 'none';
+      document.getElementById('btn-start').style.display = '';
+    }
+  }
+  state.tierBType = null;
+  render();
+}
+
+function saveApiKey() {
+  const val = document.getElementById('api-key-input').value.trim();
+  if (val) { localStorage.setItem('gemini_api_key', val); GEMINI_API_KEY = val; }
+}
+function clearSchedule() {
+  if (!state.schedule.length && state.totalStudiedSeconds === 0) return;
+  if (!confirm('🗑 مسح الجدول بالكامل؟ Clear entire schedule?')) return;
+  state.schedule = [];
+  state.intervals = [];
+  state.currentPhaseIdx = 0;
+  state.intervalIdx = 0;
+  state.timeRemaining = 25 * 60;
+  state.isRunning = false;
+  state.activeTimerType = null;
+  state.tierBAlert = false;
+  state.tierBType = null;
+  stopTick();
+  document.getElementById('btn-start').style.display = '';
+  document.getElementById('btn-pause').style.display = 'none';
+  document.getElementById('btn-clear').style.display = 'none';
+  document.getElementById('report-card').style.display = 'none';
+  render();
+  updateReport();
+}
+
+function updateReport() {
+  const hours = Math.floor(state.totalStudiedSeconds / 3600);
+  const mins = Math.floor((state.totalStudiedSeconds % 3600) / 60);
+  const display = hours > 0 ? `${hours}:${String(mins).padStart(2,'0')}` : `${mins}m`;
+  document.getElementById('report-hours').textContent = display;
+  document.getElementById('report-sessions').textContent = state.sessionHistory.length;
+
+  const hasData = state.totalStudiedSeconds > 0 || state.schedule.length > 0;
+  document.getElementById('report-card').style.display = hasData ? 'block' : 'none';
+  document.getElementById('btn-clear').style.display = state.schedule.length > 0 ? '' : 'none';
+}
+
+function finishEarly() {
+  document.getElementById('alert-overlay').classList.add('hidden');
+  state.tierBAlert = false;
+  state.tierBType = null;
+  state.isRunning = false;
+  state.activeTimerType = null;
+  stopTick();
+  document.getElementById('btn-pause').style.display = 'none';
+  document.getElementById('btn-start').style.display = '';
+  render();
+}
+
+// ==================== RENDER ====================
+function render() {
+  const mins = Math.floor(state.timeRemaining / 60);
+  const secs = state.timeRemaining % 60;
+  const display = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  const timerEl = document.getElementById('timer-display');
+  timerEl.textContent = display;
+  timerEl.className = state.timeRemaining <= 60 ? 'timer-text warning' : 'timer-text';
+
+  let label = 'READY', status = '';
+  if (state.activeTimerType === 'big_break') { label = 'BIG BREAK'; status = 'RESTING'; }
+  else if (state.activeTimerType === 'phase_intervals') {
+    const iv = state.intervals[state.intervalIdx];
+    if (iv) label = iv.type === 'study' ? 'STUDY' : 'SHORT BREAK';
+    status = state.isRunning ? 'FOCUS' : 'PAUSED';
+  }
+
+  document.getElementById('interval-label').textContent = label;
+  document.getElementById('status-focus').textContent = status || 'READY';
+
+  const totalSecs = state.activeTimerType === 'big_break' ? BIG_BREAK_MIN * 60
+    : (state.intervals[state.intervalIdx]?.duration || 25) * 60;
+  const progress = totalSecs > 0 ? state.timeRemaining / totalSecs : 0;
+  const circ = 2 * Math.PI * 118;
+  document.getElementById('progress-circle').setAttribute('stroke-dashoffset', circ * progress);
+  document.getElementById('progress-circle').style.stroke = state.timeRemaining <= 60 ? '#ef4444'
+    : state.activeTimerType === 'big_break' ? '#eab308' : '#2dd4bf';
+
+  const counter = document.getElementById('interval-counter');
+  if (state.activeTimerType === 'phase_intervals') {
+    counter.textContent = `Interval ${state.intervalIdx + 1} / ${state.intervals.length}`;
+    counter.style.color = '#94a3b8';
+  } else if (state.activeTimerType === 'big_break') {
+    counter.textContent = `Big Break — Phase ${state.currentPhaseIdx + 1} Complete`;
+    counter.style.color = '#eab308';
+  } else {
+    counter.textContent = state.schedule.length ? `${state.schedule.filter(b=>b.type==='phase').length} phases scheduled` : 'Set a schedule from the Console';
+    counter.style.color = '#94a3b8';
+  }
+  renderTimeline();
+  updateReport();
+}
+
+function renderTimeline() {
+  ['timeline-container', 'schedule-timeline'].forEach(id => {
+    const container = document.getElementById(id);
+    if (!state.schedule.length) {
+      if (id === 'timeline-container') {
+        container.innerHTML = '<div style="text-align:center;padding:40px 20px;color:#94a3b8"><p style="font-size:18px;font-weight:600;margin-bottom:8px">No schedule yet</p><p style="font-size:14px;opacity:0.7">Use the AI Console above to set your study schedule</p></div>';
+      }
+      return;
+    }
+
+    let html = '';
+    state.schedule.forEach(block => {
+      if (block.type === 'phase') {
+        const isActive = block.phaseIndex === state.currentPhaseIdx && state.activeTimerType === 'phase_intervals';
+        const cls = isActive ? 'phase-card active' : 'phase-card';
+        const badge = isActive ? 'ACTIVE' : 'PENDING';
+        const badgeCls = isActive ? 'phase-badge active-badge' : 'phase-badge';
+        html += `<div class="${cls}">
+          <div class="phase-row">
+            <span class="phase-label ${isActive ? 'active-label' : ''}">${block.label}</span>
+            <span class="${badgeCls}">${badge}</span>
+          </div>
+          <div class="phase-row">
+            <span class="phase-time">${block.startTime} - ${block.endTime}</span>
+            <span class="phase-dur">${block.duration} min</span>
+          </div>
+        </div>`;
+      } else {
+        const isActive = block.phaseIndex === state.currentPhaseIdx && state.activeTimerType === 'big_break';
+        const cls = isActive ? 'break-card active' : 'break-card';
+        html += `<div class="${cls}">
+          <div class="break-icon">☕</div>
+          <div class="break-content">
+            <div class="break-label ${isActive ? 'active-b' : ''}">${block.label}</div>
+            <div class="break-time">${block.startTime} - ${block.endTime}</div>
+            <div class="break-dur">${block.duration} min rest</div>
+          </div>
+          <div class="break-dot ${isActive ? 'active-dot' : ''}"></div>
+        </div>`;
+      }
+    });
+    container.innerHTML = html;
+  });
+
+  // Stats
+  const phases = state.schedule.filter(b => b.type === 'phase');
+  const breaks = state.schedule.filter(b => b.type === 'big_break');
+  document.getElementById('stat-phases').textContent = phases.length;
+  document.getElementById('stat-minutes').textContent = phases.reduce((a, b) => a + b.duration, 0);
+  document.getElementById('stat-breaks').textContent = breaks.length;
+  document.getElementById('stats-row').style.display = 'flex';
+}
+
+// ==================== GEMINI PARSER ====================
+const SYSTEM_PROMPT = `You are a multilingual schedule parser. Accept input in ANY language (English, Arabic, Urdu, French, etc.).
+
+Parse the user's study schedule into JSON.
+
+Rules:
+- Understand natural language time expressions in any language
+- Split the total time range into sequential 2-hour (120 min) Phase blocks
+- After each Phase block, add a mandatory 30-minute Big Break
+- Return ONLY valid JSON, no markdown, no explanation
+- Use ISO 8601 strings for dates
+
+Examples:
+- "I want to study from 3:00 PM to 7:00 PM"
+- "أريد أن أدرس من الساعة 3 إلى 7 مساءً"
+- "study block 3pm to 7pm"
+
+Output format:
+{
+  "phases": [
+    {"label": "Phase 1", "startTime": "ISO", "endTime": "ISO", "duration": 120, "type": "phase", "phaseIndex": 0},
+    {"label": "Big Break", "startTime": "ISO", "endTime": "ISO", "duration": 30, "type": "big_break", "phaseIndex": 0}
+  ]
+}`;
+
+async function parseWithGemini(text) {
+  const prompt = `${SYSTEM_PROMPT}\n\nUser schedule: "${text}"\nCurrent time: ${new Date().toISOString()}`;
+  let raw = await callGemini(prompt);
+  const jm = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (jm) raw = jm[1];
+  const bm = raw.match(/\{[\s\S]*\}/);
+  if (!bm) throw new Error('No JSON in Gemini response');
+  return JSON.parse(bm[0]);
+}
+
+function fmtTime(d) {
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+function normalizeArabicNum(s) {
+  const m = { '٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9' };
+  return s.replace(/[٠-٩]/g, c => m[c] || c);
+}
+
+// Arabic word numbers → digits, including dialect forms
+const arabicWordNums = {
+  'واحد':1,'واحدة':1,'وحدة':1,'إحدى':1,
+  'اثنين':2,'اثنان':2,'اتنين':2,'تنين':2,'ثنتين':2,
+  'ثلاثة':3,'ثلاث':3,'تلاتة':3,'تلات':3,
+  'أربعة':4,'اربعة':4,'أربع':4,'اربع':4,'أربعة':4,
+  'خمسة':5,'خمس':5,'خمسة':5,
+  'ستة':6,'ست':6,'سته':6,
+  'سبعة':7,'سبع':7,
+  'ثمانية':8,'ثماني':8,'ثمان':8,'تمانية':8,'تمانه':8,'تمنية':8,'تمانة':8,
+  'تسعة':9,'تسع':9,'تسعه':9,
+  'عشرة':10,'عشر':10,'عشره':10,
+  'أحدعش':11,'احدعش':11,'أحد عشر':11,'احد عشر':11,'إحدى عشر':11,
+  'اثنعش':12,'اثنعشر':12,'اثنى عشر':12,'اثني عشر':12,'اتنعش':12,
+  'نص':12,'نصف':12,
+};
+
+function findArabicNumber(word) {
+  const cleaned = word.replace(/[^a-zA-Z\u0600-\u06FF]/g, '');
+  return arabicWordNums[cleaned] ?? null;
+}
+
+// Replace Arabic word numbers in text with digit equivalents
+function replaceArabicWordNums(s) {
+  const words = s.split(/\s+/);
+  const result = [];
+  for (const w of words) {
+    const num = findArabicNumber(w);
+    if (num !== null) result.push(String(num));
+    else result.push(w);
+  }
+  return result.join(' ');
+}
+
+function localParse(text) {
+  // Step 1: normalize Arabic digits and word numbers
+  let normalized = normalizeArabicNum(text);
+  normalized = replaceArabicWordNums(normalized);
+
+  // Step 2: normalize time-of-day markers
+  const todMarkers = [
+    ['الصبح','صباحا','صباح','صباحاً','الصباح'], ' AM',
+    ['الظهر','ظهراً','ظهر'], ' 12PM',
+    ['العصر','عصراً','عصر','المسا','المساء','مساءً','مساء','مسا','م'], ' PM',
+    ['المغرب','مغرب','الليل','ليلاً','ليل','بالليل'], ' PM',
+  ];
+  for (const [words, replacement] of todMarkers) {
+    for (const w of words) {
+      const re = new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      normalized = normalized.replace(re, replacement);
+    }
+  }
+
+  // Step 3: normalize connectors
+  const connectorPairs = [
+    [/من\s+الساعة\s+/gi, 'from '],
+    [/من\s+الساعه\s+/gi, 'from '],
+    [/الساعة\s+/gi, ''],
+    [/الساعه\s+/gi, ''],
+    [/\bبدي\s+/gi, ''],
+    [/\bأبغى\s+/gi, ''],
+    [/\bأريد\s+/gi, ''],
+    [/\bأبي\s+/gi, ''],
+    [/\bابي\s+/gi, ''],
+    [/\bأدرس\s+/gi, 'study '],
+    [/\bادرس\s+/gi, 'study '],
+    [/\bدراسة\s+/gi, 'study '],
+    [/\bمذاكرة\s+/gi, 'study '],
+    [/\bstudy\s+/gi, 'study '],
+    // Arabic 'to' connectors
+    [/\bإلى\b/gi, ' to '],
+    [/\bالى\b/gi, ' to '],
+    [/\bالي\b/gi, ' to '],
+    [/\bلـ\b/gi, ' to '],
+    [/\bلل\b/gi, ' to '],
+    [/\bحتى\b/gi, ' to '],
+    [/\bالی\b/gi, ' to '],
+    // English
+    [/\bto\b/gi, ' to '],
+    [/\buntil\b/gi, ' to '],
+    [/\btill\b/gi, ' to '],
+  ];
+  for (const [pattern, replacement] of connectorPairs) {
+    normalized = normalized.replace(pattern, replacement);
+  }
+
+  // Step 4: strip leading/trailing noise
+  normalized = normalized.trim();
+  // Collapse spaces
+  normalized = normalized.replace(/\s+/g, ' ');
+
+  // Step 5: extract two numbers with "to" between them
+  const timePattern = /(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*to\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i;
+  const m = normalized.match(timePattern);
+  if (!m) throw new Error('ما فهمت التوقيت. جرب: "بدي أدرس من 8 الصبح لل 12 الظهر" أو "study from 3 to 7"');
+
+  let startStr = m[1].trim(), endStr = m[2].trim();
+
+  // Step 6: default AM/PM inference
+  // If "12" appears and is the end, treat as noon (12PM)
+  if (startStr === '12' || startStr === '12:00') startStr = '12PM';
+  if (endStr === '12' || endStr === '12:00') endStr = '12PM';
+  // Mornings: 1-11 without marker → AM; afternoons: 1-11 without marker → PM
+  const sh = parseInt(startStr, 10);
+  const eh = parseInt(endStr, 10);
+  if (!startStr.toLowerCase().includes('am') && !startStr.toLowerCase().includes('pm')) {
+    startStr = sh >= 1 && sh <= 11 ? startStr + ' AM' : sh >= 12 ? startStr + ' PM' : startStr;
+  }
+  if (!endStr.toLowerCase().includes('am') && !endStr.toLowerCase().includes('pm')) {
+    endStr = eh >= 1 && eh <= 11 ? endStr + ' AM' : eh >= 12 ? endStr + ' PM' : endStr;
+  }
+
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), sh, 0);
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), eh, 0);
+  if (start >= end) throw new Error('End time must be after start time');
+
+  const schedule = [];
+  let current = new Date(start), idx = 0;
+  while (current < end) {
+    const pe = new Date(current);
+    pe.setMinutes(pe.getMinutes() + 120);
+    const capped = pe > end ? end : pe;
+    const dur = Math.round((capped - current) / 60000);
+    if (dur <= 0) break;
+    schedule.push({ id: `phase-${idx}`, label: `Phase ${idx+1}`, startTime: fmtTime(current), endTime: fmtTime(capped), duration: dur, type: 'phase', phaseIndex: idx });
+    current = new Date(capped);
+    // Only add Big Break between phases, not after the last one
+    // Require at least one full study interval (25 min) to fit after the break
+    const afterBreak = new Date(current);
+    afterBreak.setMinutes(afterBreak.getMinutes() + 30 + 25);
+    if (afterBreak <= end) {
+      const be = new Date(current);
+      be.setMinutes(be.getMinutes() + 30);
+      schedule.push({ id: `big-break-${idx}`, label: 'Big Break', startTime: fmtTime(current), endTime: fmtTime(be), duration: 30, type: 'big_break', phaseIndex: idx });
+      current = be;
+    }
+    idx++;
+  }
+  return schedule;
+}
+
+// ==================== NORMALIZE ====================
+function normalizeSchedule(blocks) {
+  // Remove any Big Break at the very end
+  while (blocks.length > 0 && blocks[blocks.length - 1].type === 'big_break') {
+    blocks.pop();
+  }
+
+  // Ensure a Big Break exists between consecutive phases
+  const result = [];
+  for (let i = 0; i < blocks.length; i++) {
+    result.push(blocks[i]);
+    if (
+      blocks[i].type === 'phase' &&
+      i + 1 < blocks.length &&
+      blocks[i + 1].type === 'phase' &&
+      blocks[i + 1].phaseIndex === blocks[i].phaseIndex + 1
+    ) {
+      // Insert missing Big Break between phases
+      result.push({
+        id: `big-break-${blocks[i].phaseIndex}`,
+        label: 'Big Break',
+        startTime: blocks[i].endTime,
+        endTime: blocks[i + 1].startTime,
+        duration: 30,
+        type: 'big_break',
+        phaseIndex: blocks[i].phaseIndex,
+      });
+    }
+  }
+  return result;
+}
+
+// ==================== COMMANDS ====================
+async function sendCommand() {
+  const input = document.getElementById('console-input');
+  const btn = document.getElementById('console-send-btn');
+  const errEl = document.getElementById('console-error');
+  const text = input.value.trim();
+  if (!text || state.isSending) return;
+
+  errEl.style.display = 'none';
+  state.isSending = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  btn.disabled = true;
+
+  try {
+    const cmdText = normalizeArabicNum(text).toLowerCase();
+
+    // 🗑 Delete / Clear command
+    if (cmdText.includes('حذف') || cmdText.includes('مسح') || cmdText.includes('delete') ||
+        cmdText.includes('clear') || cmdText.includes('إلغاء') || cmdText.includes('الغاء')) {
+      clearSchedule();
+      input.value = '';
+      return;
+    }
+
+    // 📊 Report command
+    if (cmdText.includes('تقرير') || cmdText.includes('report') || cmdText.includes('احصائ') ||
+        cmdText.includes('إحصاء') || cmdText.includes('ساعات') || cmdText.includes('statistic') ||
+        cmdText.includes('كم ساعة')) {
+      switchTab('schedule');
+      updateReport();
+      showError('📊 التقرير الأسبوعي — Weekly report', '#2dd4bf');
+      input.value = '';
+      return;
+    }
+
+    // ⏰ Adjust / Delay / Change time
+    if (cmdText.includes('extend') || cmdText.includes('delay') ||
+        cmdText.includes('مد') || cmdText.includes('زد') || cmdText.includes('طول') ||
+        cmdText.includes('وسع') || cmdText.includes('زيادة') ||
+        cmdText.includes('أخر') || cmdText.includes('اجل') || cmdText.includes('تأخير') ||
+        cmdText.includes('تاجيل') || cmdText.includes('غيرت') || cmdText.includes('تغيير') ||
+        cmdText.includes('عدل') || cmdText.includes('تعديل') || cmdText.includes('غير') ||
+        cmdText.includes('بدل') || cmdText.includes('تبديل')) {
+      handleAdjust(text);
+      input.value = '';
+      return;
+    }
+
+    // Try Gemini first
+    let schedule;
+    try {
+      const res = await parseWithGemini(text);
+      schedule = normalizeSchedule(res.phases.map((p, i) => ({
+        id: p.id || `${p.type}-${i}`,
+        label: p.label,
+        startTime: p.startTime,
+        endTime: p.endTime,
+        duration: p.duration,
+        type: p.type,
+        phaseIndex: p.phaseIndex ?? i,
+      })));
+    } catch (geminiErr) {
+      console.warn('Gemini failed, using local parser:', geminiErr.message);
+      schedule = normalizeSchedule(localParse(text));
+    }
+
+    state.schedule = schedule;
+    state.currentPhaseIdx = 0;
+    state.consoleInput = text;
+    input.value = '';
+
+    render();
+
+    document.getElementById('btn-start').style.display = '';
+    document.getElementById('btn-pause').style.display = 'none';
+    switchTab('study');
+
+    const counter = document.getElementById('interval-counter');
+    counter.textContent = `${schedule.filter(b=>b.type==='phase').length} phases scheduled — press START`;
+    counter.style.color = '#2dd4bf';
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+  } finally {
+    state.isSending = false;
+    btn.innerHTML = '→';
+    btn.disabled = false;
+  }
+}
+
+function handleAdjust(text) {
+  if (!state.schedule.length) { showError('No schedule to adjust'); return; }
+  let cmd = normalizeArabicNum(text);
+
+  // Extend break — English + Arabic + Urdu
+  const extendPatterns = [
+    /extend.*?break.*?(\d+)\s*minutes?/i,
+    /(\d+)\s*minutes?\s*(?:more|extra|longer)?\s*(?:for\s+)?break/i,
+    /(?:مد|زد|طوّل|طول|وسع|وسّع|زيادة)\s*(?:ال)?(?:break|بريك|راحة|استراحة)?\s*(?:بـ?|ب)?\s*(\d+)\s*(?:دقيقة|دقائق|minutes?|min)?/i,
+  ];
+  for (const p of extendPatterns) {
+    const em = cmd.match(p);
+    if (em) {
+      const mins = parseInt(em[1], 10);
+      const bi = state.schedule.findIndex(b => b.type === 'big_break' && b.phaseIndex === state.currentPhaseIdx);
+      if (bi >= 0) {
+        const b = state.schedule[bi];
+        b.duration += mins;
+        for (let i = bi + 1; i < state.schedule.length; i++) {
+          const st = new Date(`1/1/2000 ${state.schedule[i].startTime}`);
+          st.setMinutes(st.getMinutes() + mins); state.schedule[i].startTime = fmtTime(st);
+          const et = new Date(`1/1/2000 ${state.schedule[i].endTime}`);
+          et.setMinutes(et.getMinutes() + mins); state.schedule[i].endTime = fmtTime(et);
+        }
+        render(); showError(`Extended Big Break by ${mins} min`, '#2dd4bf');
+      }
+      return;
+    }
+  }
+
+  // Delay — English + Arabic + Urdu
+  const delayPatterns = [
+    /delay\s+(phase\s+\d+).*?(\d+)\s*minutes?/i,
+    /(\d+)\s*minutes?\s*(?:delay|later|shift|postpone)\s+(phase\s+\d+|break)/i,
+    /(?:أخر|أخّر|اجل|أجّل|تأخير)\s*(?:ال)?(?:phase|فيز|مرحلة)\s*(\d+)?\s*(?:بـ?|ب)?\s*(\d+)\s*(?:دقيقة|دقائق|minutes?|min)?/i,
+  ];
+  for (const p of delayPatterns) {
+    const dm = cmd.match(p);
+    if (dm) {
+      const mins = parseInt(dm[dm.length - 1], 10);
+      const target = dm[1]?.toLowerCase() || '';
+      const idx = state.schedule.findIndex(b => b.label.toLowerCase() === `phase ${dm[2] || ''}`.trim() || b.label.toLowerCase().includes(target));
+      if (idx >= 0) {
+        for (let i = idx; i < state.schedule.length; i++) {
+          const st = new Date(`1/1/2000 ${state.schedule[i].startTime}`);
+          st.setMinutes(st.getMinutes() + mins); state.schedule[i].startTime = fmtTime(st);
+          const et = new Date(`1/1/2000 ${state.schedule[i].endTime}`);
+          et.setMinutes(et.getMinutes() + mins); state.schedule[i].endTime = fmtTime(et);
+        }
+        render(); showError(`Delayed by ${mins} min`, '#2dd4bf');
+      }
+      return;
+    }
+  }
+
+  showError('Try: "extend break by 15 min", "delay Phase 2 by 10", or "مدد الاستراحة 15 دقيقة"');
+}
+
+function showError(msg, color = '#ef4444') {
+  const el = document.getElementById('console-error');
+  el.textContent = msg;
+  el.style.color = color;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+// ==================== NAV ====================
+function switchTab(name) {
+  document.querySelectorAll('.screen').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.getElementById(`screen-${name}`).classList.remove('hidden');
+  document.getElementById(`tab-${name}`).classList.add('active');
+}
+
+// ==================== INIT ====================
+render();
+</script>
+</body>
+</html>

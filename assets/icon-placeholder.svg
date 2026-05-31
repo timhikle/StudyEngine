@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a"/>
+      <stop offset="100%" style="stop-color:#1e293b"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="228" fill="url(#bg)"/>
+  <!-- Circular timer frame -->
+  <circle cx="512" cy="440" r="200" fill="none" stroke="#2dd4bf" stroke-width="12"/>
+  <circle cx="512" cy="440" r="200" fill="none" stroke="#94a3b8" stroke-width="4"
+    stroke-dasharray="30 20" opacity="0.3"/>
+  <!-- Stylized P with cascading nodes -->
+  <circle cx="420" cy="360" r="16" fill="#2dd4bf"/>
+  <circle cx="460" cy="410" r="14" fill="#2dd4bf" opacity="0.85"/>
+  <circle cx="500" cy="460" r="12" fill="#2dd4bf" opacity="0.7"/>
+  <circle cx="530" cy="510" r="10" fill="#2dd4bf" opacity="0.5"/>
+  <!-- Connecting line (P stem) -->
+  <line x1="420" y1="360" x2="530" y2="510" stroke="#2dd4bf" stroke-width="4" opacity="0.4"/>
+  <!-- Phase Study text indicator -->
+  <text x="512" y="720" text-anchor="middle" fill="#f8fafc" font-family="Arial, sans-serif"
+    font-size="48" font-weight="700" letter-spacing="4">PHASE STUDY</text>
+  <text x="512" y="770" text-anchor="middle" fill="#94a3b8" font-family="Arial, sans-serif"
+    font-size="24" letter-spacing="6">v1.0</text>
+</svg>
