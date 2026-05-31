@@ -75,7 +75,6 @@ class TimerService : Service() {
     stopTicking()
     isRunning = false
     releaseWakeLock()
-    stopRingtone()
     stopForeground(STOP_FOREGROUND_REMOVE)
     super.onDestroy()
   }
