@@ -1,9 +1,12 @@
 import { ParsedSchedule, ScheduleBlock } from '../types';
 import { parseTimeString, getNowISO } from '../utils/time';
-import { GEMINI_API_KEY } from '../config';
+import { GROQ_API_KEY } from '../config';
 
-let apiKey = GEMINI_API_KEY;
-export function setGeminiApiKey(key: string) { apiKey = key; }
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
+
+let apiKey = GROQ_API_KEY;
+export function setGroqApiKey(key: string) { apiKey = key; }
 
 const SYSTEM_PROMPT = `You are a multilingual schedule parser. Accept input in ANY language (English, Arabic, Urdu, French, etc.).
 
@@ -46,38 +49,35 @@ Output format:
   ]
 }`;
 
-async function callGemini(input: string): Promise<string> {
-  if (apiKey === GEMINI_API_KEY_PLACEHOLDER) {
-    throw new Error('Gemini API key not configured. Set it with setGeminiApiKey().');
+async function callGroq(input: string): Promise<string> {
+  if (!apiKey) {
+    throw new Error('GROQ_API_KEY not configured. Set it with setGroqApiKey().');
   }
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: `${SYSTEM_PROMPT}\n\nUser schedule: "${input}"\nCurrent time: ${new Date().toISOString()}` }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 1024,
-        },
-      }),
-    }
-  );
+  const response = await fetch(GROQ_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: `Schedule: "${input}"\nCurrent time: ${new Date().toISOString()}` },
+      ],
+      temperature: 0.1,
+      max_tokens: 1024,
+    }),
+  });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Gemini API error: ${response.status} ${errorText}`);
+    throw new Error(`Groq API error: ${response.status} ${errorText}`);
   }
 
   const data = await response.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const text = data?.choices?.[0]?.message?.content || '';
   return text;
 }
 
@@ -107,7 +107,6 @@ const arabicWordNums: Record<string, number> = {
 };
 
 function normalizeArabicTime(input: string): string {
-  // Replace Arabic numeral digits
   const digitMap: Record<string, string> = {
     '٠':'0','١':'1','٢':'2','٣':'3','٤':'4',
     '٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
@@ -116,7 +115,6 @@ function normalizeArabicTime(input: string): string {
   };
   let s = input.replace(/[٠-٩۰-۹]/g, (c) => digitMap[c] || c);
 
-  // Replace Arabic word numbers
   const words = s.split(/\s+/);
   const result: string[] = [];
   for (const w of words) {
@@ -126,7 +124,6 @@ function normalizeArabicTime(input: string): string {
   }
   s = result.join(' ');
 
-  // Normalize time-of-day markers
   const tod: [string[], string][] = [
     [['الصبح','صباحا','صباح','صباحاً','الصباح'], ' AM'],
     [['الظهر','ظهراً','ظهر'], ' 12PM'],
@@ -139,7 +136,6 @@ function normalizeArabicTime(input: string): string {
     }
   }
 
-  // Normalize connectors
   const connectors: [RegExp, string][] = [
     [/من\s+الساعة\s+/gi, 'from '],
     [/من\s+الساعه\s+/gi, 'from '],
@@ -186,7 +182,6 @@ function fallbackParse(input: string): ParsedSchedule {
   let startStr = timeMatch[1].trim();
   let endStr = timeMatch[2].trim();
 
-  // Default 12 → 12PM (noon)
   if (/^12$|^12:00$/.test(startStr) && !startStr.toLowerCase().includes('am') && !startStr.toLowerCase().includes('pm')) startStr = '12PM';
   if (/^12$|^12:00$/.test(endStr) && !endStr.toLowerCase().includes('am') && !endStr.toLowerCase().includes('pm')) endStr = '12PM';
 
@@ -236,8 +231,6 @@ function fallbackParse(input: string): ParsedSchedule {
 
     current = new Date(cappedEnd);
 
-    // Only add Big Break between phases, not after the last one
-    // Require at least one full study interval (25 min) to fit after the break
     const afterBreak = new Date(current);
     afterBreak.setMinutes(afterBreak.getMinutes() + 30 + 25);
     if (afterBreak <= end) {
@@ -265,7 +258,7 @@ function fallbackParse(input: string): ParsedSchedule {
 
 export async function parseSchedule(input: string): Promise<ParsedSchedule> {
   try {
-    const rawResponse = await callGemini(input);
+    const rawResponse = await callGroq(input);
     const jsonStr = tryExtractJSON(rawResponse);
     const data = JSON.parse(jsonStr);
     const phases: ScheduleBlock[] = (data.phases || []).map((p: any, i: number) => ({
@@ -288,18 +281,16 @@ export async function processAdjustment(
   command: string,
   currentSchedule: ScheduleBlock[]
 ): Promise<{ phases: ScheduleBlock[]; message: string }> {
-  // Arabic number normalization
   const arabicNumMap: Record<string, string> = {
     '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
     '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
   };
   let cmd = command.replace(/[٠-٩]/g, (c) => arabicNumMap[c] || c);
 
-  // Extend break — English + Arabic + Urdu
   const extendPatterns = [
     /extend.*?break.*?(\d+)\s*minutes?/i,
     /(\d+)\s*minutes?\s*(?:more|extra|longer)?\s*(?:for\s+)?break/i,
-    /(?:مد|زد|طوّل|طول|وسع|وسّع|زيادة)\s*(?:ال)?(?:break|بريك|راحة|استراحة|break)?\s*(?:بـ?|ب)?\s*(\d+)\s*(?:دقيقة|دقائق|minutes?|min)?/i,
+    /(?:مد|زد|طوّل|طول|وسع|وسّع|زيادة)\s*(?:ال)?(?:break|بريك|راحة|استراحة)?\s*(?:بـ?|ب)?\s*(\d+)\s*(?:دقيقة|دقائق|minutes?|min)?/i,
     /break\s*(?:ko|ميں)?\s*(\d+)\s*(?:minute|min|منٹ)?\s*(?:aur|اور|بادھ)?\s*(?:barhao|بڑھاؤ|بڑھا)?/i,
   ];
 
@@ -332,7 +323,6 @@ export async function processAdjustment(
     }
   }
 
-  // Delay — English + Arabic + Urdu
   const delayPatterns = [
     /delay\s+(phase\s+\d+|phase\s+\d+|break).*?(\d+)\s*minutes?/i,
     /(\d+)\s*minutes?\s*(?:delay|later|shift|postpone)\s+(phase\s+\d+|break)/i,

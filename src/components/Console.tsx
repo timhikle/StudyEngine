@@ -37,7 +37,7 @@ export const Console: React.FC = () => {
         <View style={styles.header}>
           <Text style={styles.title}>AI Console</Text>
           <View style={styles.statusDot} />
-          <Text style={styles.statusText}>Gemini 2.5 Flash-Lite</Text>
+          <Text style={styles.statusText}>Groq AI</Text>
         </View>
 
         {error && (

@@ -11,7 +11,7 @@ import {
   BIG_BREAK_DURATION,
   INTERVALS_PER_PHASE,
 } from '../utils/schedule';
-import { parseSchedule, processAdjustment } from '../services/gemini';
+import { parseSchedule, processAdjustment } from '../services/groq';
 import { playTierAAlert, playTierBAlert, stopTierBAlert } from '../services/audio';
 import { BackgroundService } from '../services/background';
 

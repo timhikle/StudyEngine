@@ -27,7 +27,7 @@ export interface ParsedSchedule {
   originalInput: string;
 }
 
-export interface GeminiResponse {
+export interface GroqResponse {
   schedule: ParsedSchedule;
   raw: string;
 }
