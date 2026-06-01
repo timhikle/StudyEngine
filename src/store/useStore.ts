@@ -1,5 +1,5 @@
 import { create } from '../lib/zustand';
-import { AppState, ScheduleBlock, StudyInterval, TierBType } from '../types';
+import { AppState, AppSettings, ScheduleBlock, StudyInterval, TierBType } from '../types';
 import {
   generateScheduleBlocks,
   generateIntervals,
@@ -9,9 +9,10 @@ import {
   STUDY_DURATION,
   SHORT_BREAK_DURATION,
   BIG_BREAK_DURATION,
+  PHASE_DURATION,
   INTERVALS_PER_PHASE,
 } from '../utils/schedule';
-import { parseSchedule, processAdjustment } from '../services/groq';
+import { parseSchedule, processAdjustment } from '../services/gemini';
 import { playTierAAlert, playTierBAlert, stopTierBAlert } from '../services/audio';
 import { BackgroundService } from '../services/background';
 
@@ -41,15 +42,29 @@ export const useStore = create<AppState>((set, get) => ({
   bigBreakTimeRemaining: BIG_BREAK_DURATION * 60,
   isRunning: false,
   activeTimerType: null,
+  isWaitingToStart: false,
+  waitingUntil: null,
   tierBAlert: false,
   tierBType: null,
   consoleInput: '',
+  suggestion: null,
   isConsoleLocked: false,
   isParsing: false,
   error: null,
   version: 0,
   totalStudiedSeconds: 0,
   sessionHistory: [],
+  isSessionComplete: false,
+  sessionCompleteStats: null,
+  settings: {
+    studyDuration: STUDY_DURATION,
+    shortBreakDuration: SHORT_BREAK_DURATION,
+    phaseDuration: PHASE_DURATION,
+    bigBreakDuration: BIG_BREAK_DURATION,
+    intervalsPerPhase: INTERVALS_PER_PHASE,
+    soundEnabled: true,
+    tierBEnabled: true,
+  },
 
   setConsoleInput: (input: string) => set({ consoleInput: input }),
 
@@ -73,23 +88,52 @@ export const useStore = create<AppState>((set, get) => ({
           error: null,
         }));
       } else {
-        const parsed = await parseSchedule(input);
+        const parsed = await parseSchedule(input, state.totalStudiedSeconds);
+        const sett = get().settings;
         const normalized = normalizeSchedule(parsed.phases);
-        const intervals = generateIntervals();
-        set({
-          schedule: normalized,
-          intervals,
-          currentPhaseIndex: 0,
-          currentIntervalIndex: 0,
-          intervals,
-          timeRemaining: STUDY_DURATION * 60,
-          isRunning: true,
-          activeTimerType: 'phase_intervals',
-          consoleInput: '',
-          isParsing: false,
-          error: null,
-          version: new Date().getTime(),
-        });
+        const intervals = generateIntervals(sett);
+        const firstPhase = normalized[0];
+        const now = new Date();
+        const firstStart = new Date(firstPhase.startTime);
+        const secondsUntilStart = Math.round((firstStart.getTime() - now.getTime()) / 1000);
+
+        if (secondsUntilStart > 10) {
+          set({
+            schedule: normalized,
+            intervals,
+            currentPhaseIndex: 0,
+            currentIntervalIndex: 0,
+            timeRemaining: secondsUntilStart,
+            isRunning: true,
+            activeTimerType: 'waiting',
+            isWaitingToStart: true,
+            waitingUntil: firstPhase.startTime,
+            suggestion: parsed.suggestion || null,
+            consoleInput: '',
+            isParsing: false,
+            error: null,
+            version: new Date().getTime(),
+          });
+          BackgroundService.start(secondsUntilStart, 'waiting');
+        } else {
+          set({
+            schedule: normalized,
+            intervals,
+            currentPhaseIndex: 0,
+            currentIntervalIndex: 0,
+            timeRemaining: sett.studyDuration * 60,
+            isRunning: true,
+            activeTimerType: 'phase_intervals',
+            isWaitingToStart: false,
+            waitingUntil: null,
+            suggestion: parsed.suggestion || null,
+            consoleInput: '',
+            isParsing: false,
+            error: null,
+            version: new Date().getTime(),
+          });
+          BackgroundService.start(sett.studyDuration * 60, 'phase_intervals');
+        }
       }
     } catch (err: any) {
       set({ error: err.message || 'Failed to process command', isParsing: false });
@@ -162,19 +206,59 @@ export const useStore = create<AppState>((set, get) => ({
     const state = get();
     if (state.activeTimerType === 'big_break') {
       set({ bigBreakTimeRemaining: remainingSeconds, version: state.version + 1 });
+    } else if (state.activeTimerType === 'waiting') {
+      set({ timeRemaining: remainingSeconds, version: state.version + 1 });
     } else {
       set({ timeRemaining: remainingSeconds, version: state.version + 1 });
     }
   },
 
   onNativeComplete: () => {
+    const state = get();
+    if (state.activeTimerType === 'waiting') {
+      BackgroundService.stop();
+      const intervals = generateIntervals(state.settings);
+      set({
+        intervals,
+        currentIntervalIndex: 0,
+        timeRemaining: state.settings.studyDuration * 60,
+        isRunning: true,
+        activeTimerType: 'phase_intervals',
+        isWaitingToStart: false,
+        waitingUntil: null,
+        version: state.version + 1,
+      });
+      BackgroundService.start(state.settings.studyDuration * 60, 'phase_intervals');
+      return;
+    }
     get().handleIntervalComplete();
+  },
+
+  skipWait: () => {
+    const state = get();
+    BackgroundService.stop();
+    const intervals = generateIntervals(state.settings);
+    set({
+      intervals,
+      currentIntervalIndex: 0,
+      timeRemaining: state.settings.studyDuration * 60,
+      isRunning: true,
+      activeTimerType: 'phase_intervals',
+      isWaitingToStart: false,
+      waitingUntil: null,
+      version: state.version + 1,
+    });
+    BackgroundService.start(state.settings.studyDuration * 60, 'phase_intervals');
   },
 
   startTimer: () => {
     const state = get();
     if (state.schedule.length === 0) return;
     const timerType = state.activeTimerType || 'phase_intervals';
+    if (timerType === 'waiting') {
+      get().skipWait();
+      return;
+    }
     const totalSec = timerType === 'big_break' ? state.bigBreakTimeRemaining : state.timeRemaining;
     set({ isRunning: true, activeTimerType: timerType });
     BackgroundService.start(totalSec, timerType);
@@ -190,9 +274,29 @@ export const useStore = create<AppState>((set, get) => ({
     BackgroundService.resume();
   },
 
+  clearSchedule: () => {
+    set((s) => ({
+      schedule: [],
+      intervals: [],
+      currentPhaseIndex: 0,
+      currentIntervalIndex: 0,
+      timeRemaining: s.settings.studyDuration * 60,
+      isRunning: false,
+      activeTimerType: null,
+      isWaitingToStart: false,
+      waitingUntil: null,
+      suggestion: null,
+      tierBAlert: false,
+      tierBType: null,
+      version: s.version + 1,
+    }));
+    BackgroundService.stop();
+  },
+
   dismissAlert: () => {
     stopTierBAlert();
     const state = get();
+    const sett = state.settings;
 
     if (state.tierBType === 'phase_end') {
       // Check if there's a Big Break after this phase
@@ -205,35 +309,40 @@ export const useStore = create<AppState>((set, get) => ({
           tierBType: null,
           isRunning: true,
           activeTimerType: 'big_break',
-          bigBreakTimeRemaining: BIG_BREAK_DURATION * 60,
+          bigBreakTimeRemaining: sett.bigBreakDuration * 60,
           version: state.version + 1,
         });
-        BackgroundService.start(BIG_BREAK_DURATION * 60, 'big_break');
+        BackgroundService.start(sett.bigBreakDuration * 60, 'big_break');
       } else {
         const nextPhaseIdx = state.currentPhaseIndex + 1;
         const nextPhase = state.schedule.find(
           (b) => b.type === 'phase' && b.phaseIndex === nextPhaseIdx
         );
         if (nextPhase) {
-          const newIntervals = generateIntervals();
+          const newIntervals = generateIntervals(sett);
           set({
             intervals: newIntervals,
             currentIntervalIndex: 0,
             currentPhaseIndex: nextPhaseIdx,
-            timeRemaining: STUDY_DURATION * 60,
+            timeRemaining: sett.studyDuration * 60,
             isRunning: true,
             activeTimerType: 'phase_intervals',
             tierBAlert: false,
             tierBType: null,
             version: state.version + 1,
           });
-          BackgroundService.start(STUDY_DURATION * 60, 'phase_intervals');
+          BackgroundService.start(sett.studyDuration * 60, 'phase_intervals');
         } else {
           set({
             tierBAlert: false,
             tierBType: null,
             isRunning: false,
             activeTimerType: null,
+            isSessionComplete: true,
+            sessionCompleteStats: {
+              totalMinutes: Math.round(state.totalStudiedSeconds / 60),
+              phasesDone: state.currentPhaseIndex + 1,
+            },
             version: state.version + 1,
           });
           BackgroundService.stop();
@@ -248,25 +357,30 @@ export const useStore = create<AppState>((set, get) => ({
         (b) => b.type === 'phase' && b.phaseIndex === nextPhaseIdx
       );
       if (nextPhase) {
-        const newIntervals = generateIntervals();
+        const newIntervals = generateIntervals(sett);
         set({
           intervals: newIntervals,
           currentIntervalIndex: 0,
           currentPhaseIndex: nextPhaseIdx,
-          timeRemaining: STUDY_DURATION * 60,
+          timeRemaining: sett.studyDuration * 60,
           isRunning: true,
           activeTimerType: 'phase_intervals',
           tierBAlert: false,
           tierBType: null,
           version: state.version + 1,
         });
-        BackgroundService.start(STUDY_DURATION * 60, 'phase_intervals');
+        BackgroundService.start(sett.studyDuration * 60, 'phase_intervals');
       } else {
         set({
           tierBAlert: false,
           tierBType: null,
           isRunning: false,
           activeTimerType: null,
+          isSessionComplete: true,
+          sessionCompleteStats: {
+            totalMinutes: Math.round(state.totalStudiedSeconds / 60),
+            phasesDone: state.currentPhaseIndex + 1,
+          },
           version: state.version + 1,
         });
         BackgroundService.stop();
@@ -281,21 +395,6 @@ export const useStore = create<AppState>((set, get) => ({
     set((s) => ({ schedule: phases, version: s.version + 1 }));
   },
 
-  clearSchedule: () => {
-    set((s) => ({
-      schedule: [],
-      intervals: [],
-      currentPhaseIndex: 0,
-      currentIntervalIndex: 0,
-      timeRemaining: STUDY_DURATION * 60,
-      isRunning: false,
-      activeTimerType: null,
-      tierBAlert: false,
-      tierBType: null,
-      version: s.version + 1,
-    }));
-  },
-
   addStudiedSeconds: (seconds: number) => {
     set((s) => ({ totalStudiedSeconds: s.totalStudiedSeconds + seconds, version: s.version + 1 }));
   },
@@ -304,11 +403,12 @@ export const useStore = create<AppState>((set, get) => ({
     const state = get();
     const serviceState = await BackgroundService.getState();
     if (serviceState?.isRunning && !state.isRunning && !state.tierBAlert) {
+      const isWait = serviceState.timerType === 'waiting';
       set({
         isRunning: true,
         activeTimerType: serviceState.timerType as any,
-        timeRemaining: serviceState.timerType === 'phase_intervals' ? serviceState.remainingSeconds : state.timeRemaining,
-        bigBreakTimeRemaining: serviceState.timerType === 'big_break' ? serviceState.remainingSeconds : state.bigBreakTimeRemaining,
+        isWaitingToStart: isWait,
+        timeRemaining: serviceState.remainingSeconds,
         version: state.version + 1,
       });
     }
@@ -344,5 +444,13 @@ export const useStore = create<AppState>((set, get) => ({
     if (blockIndex === -1) return;
     const updated = slideSchedule(state.schedule, blockIndex, minutes);
     set((s) => ({ schedule: updated, version: s.version + 1 }));
+  },
+
+  updateSettings: (partial: Partial<AppSettings>) => {
+    set((s) => ({ settings: { ...s.settings, ...partial }, version: s.version + 1 }));
+  },
+
+  dismissSessionComplete: () => {
+    set({ isSessionComplete: false, sessionCompleteStats: null });
   },
 }));

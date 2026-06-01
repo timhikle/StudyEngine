@@ -54,10 +54,12 @@ class TimerService : Service() {
       "PAUSE" -> {
         stopTicking()
         isRunning = false
+        releaseWakeLock()
         updateNotification()
       }
       "RESUME" -> {
         isRunning = true
+        acquireWakeLock()
         startTicking()
         updateNotification()
       }
@@ -155,7 +157,7 @@ class TimerService : Service() {
       wakeLock = power.newWakeLock(
         PowerManager.PARTIAL_WAKE_LOCK, "PhaseStudy:TimerLock"
       )
-      wakeLock?.acquire(10 * 60 * 1000L)
+      wakeLock?.acquire()
     }
   }
 

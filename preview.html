@@ -153,7 +153,7 @@
       <h1>Console</h1>
       <span style="display:flex;align-items:center;gap:4px">
         <span style="width:8px;height:8px;border-radius:4px;background:#2dd4bf;animation:pulse-dot 2s infinite"></span>
-        <span style="color:#2dd4bf;font-size:12px">Groq Online</span>
+        <span style="color:#2dd4bf;font-size:12px">Gemini Online</span>
       </span>
     </div>
 
@@ -161,7 +161,7 @@
       <div class="console-header">
         <h3>AI Console</h3>
         <span class="console-dot"></span>
-        <span class="console-model">Groq AI (Llama 3.3 70B)</span>
+        <span class="console-model">Gemini 2.5 Flash-Lite</span>
       </div>
       <div class="console-error" id="console-error"></div>
       <div class="console-input">
@@ -170,7 +170,7 @@
       </div>
         <div class="console-hint">🗓 "أدرس من 8 لل 12" ⏱ "مدد 10 دقائق" 📊 "تقرير" 🗑 "حذف"</div>
         <div style="display:flex;gap:6px;padding:8px 16px 4px;align-items:center">
-          <input id="api-key-input" type="password" placeholder="GROQ_API_KEY (optional)" style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:6px 10px;color:#f8fafc;font-size:11px;outline:none">
+          <input id="api-key-input" type="password" placeholder="Gemini API Key (optional)" style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:6px 10px;color:#f8fafc;font-size:11px;outline:none">
           <button onclick="saveApiKey()" style="background:transparent;border:1px solid #2dd4bf;color:#2dd4bf;border-radius:8px;padding:6px 12px;font-size:11px;cursor:pointer;font-weight:600">SAVE</button>
         </div>
     </div>
@@ -186,6 +186,9 @@
 
   <!-- SCHEDULE SCREEN -->
   <div class="screen hidden" id="screen-schedule">
+
+  <!-- SETTINGS SCREEN -->
+  <div class="screen hidden" id="screen-settings">
     <div class="header">
       <h1>Schedule</h1>
       <button class="btn btn-small btn-danger" id="btn-clear" onclick="clearSchedule()" style="display:none;padding:6px 14px;font-size:12px;border-radius:8px;background:transparent;border:1px solid #ef4444;color:#ef4444;cursor:pointer">🗑 مسح</button>
@@ -240,6 +243,26 @@
     </div>
   </div>
 
+  <!-- SESSION COMPLETE OVERLAY -->
+  <div class="alert-overlay hidden" id="complete-overlay">
+    <div class="alert-card" style="border-color:#2dd4bf">
+      <div style="font-size:48px;margin-bottom:16px">🎉</div>
+      <div class="alert-title" style="color:#2dd4bf;font-size:22px">SESSION COMPLETE</div>
+      <div style="display:flex;gap:32px;justify-content:center;margin:20px 0">
+        <div style="text-align:center">
+          <div style="font-size:28px;font-weight:700;color:#f8fafc" id="complete-phases">0</div>
+          <div style="font-size:11px;color:#94a3b8;letter-spacing:1px;margin-top:4px">PHASES</div>
+        </div>
+        <div style="width:1px;background:#334155"></div>
+        <div style="text-align:center">
+          <div style="font-size:28px;font-weight:700;color:#f8fafc" id="complete-time">0h 0m</div>
+          <div style="font-size:11px;color:#94a3b8;letter-spacing:1px;margin-top:4px">STUDIED</div>
+        </div>
+      </div>
+      <button class="alert-btn alert-btn-dismiss" onclick="dismissSessionComplete()">DISMISS</button>
+    </div>
+  </div>
+
   <!-- TAB BAR -->
   <div class="tab-bar">
     <div class="tab active" onclick="switchTab('study')" id="tab-study">
@@ -254,35 +277,34 @@
       <div class="tab-icon">☰</div>
       <div class="tab-label">Schedule</div>
     </div>
+    <div class="tab" onclick="switchTab('settings')" id="tab-settings">
+      <div class="tab-icon">⚙</div>
+      <div class="tab-label">Settings</div>
+    </div>
   </div>
 </div>
 
 <script>
-// ==================== GROQ API ====================
-const GROQ_API_KEY = localStorage.getItem('groq_api_key') || '';
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+// ==================== GEMINI API ====================
+const GEMINI_API_KEY = localStorage.getItem('gemini_api_key') || '';
+const GEMINI_MODEL = 'gemini-2.5-flash-lite';
 
-async function callGroq(systemPrompt, userPrompt) {
-  const res = await fetch(GROQ_API_URL, {
+async function callGemini(prompt) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+  const res = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${GROQ_API_KEY}`,
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: GROQ_MODEL,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.1,
-      max_tokens: 1024,
-    }),
+      contents: [{
+        role: 'user',
+        parts: [{ text: prompt }]
+      }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 1024 }
+    })
   });
-  if (!res.ok) throw new Error(`Groq API error ${res.status}`);
+  if (!res.ok) throw new Error(`Gemini API error ${res.status}`);
   const data = await res.json();
-  return data?.choices?.[0]?.message?.content || '';
+  return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
 }
 
 // ==================== STATE ====================
@@ -300,18 +322,30 @@ const state = {
   isSending: false,
   totalStudiedSeconds: 0,
   sessionHistory: [],
+  isWaitingToStart: false,
+  waitingUntil: null,
+  suggestion: null,
+  isSessionComplete: false,
+  sessionCompleteStats: null,
+  settings: {
+    studyDuration: 25,
+    shortBreakDuration: 5,
+    phaseDuration: 120,
+    bigBreakDuration: 30,
+    intervalsPerPhase: 4,
+    soundEnabled: true,
+    tierBEnabled: true,
+  },
 };
 
-const PHASE_MIN = 120, BIG_BREAK_MIN = 30, STUDY_MIN = 25, SHORT_BREAK_MIN = 5, INTERVALS_PER_PHASE = 4;
-
-// ==================== TIMER ====================
-let timerInterval = null;
+function getS() { return state.settings; }
 
 function genIntervals() {
+  const s = getS();
   const arr = [];
-  for (let i = 0; i < INTERVALS_PER_PHASE; i++) {
-    arr.push({ type: 'study', duration: STUDY_MIN, status: i === 0 ? 'active' : 'pending' });
-    if (i < INTERVALS_PER_PHASE - 1) arr.push({ type: 'short_break', duration: SHORT_BREAK_MIN, status: 'pending' });
+  for (let i = 0; i < s.intervalsPerPhase; i++) {
+    arr.push({ type: 'study', duration: s.studyDuration, status: i === 0 ? 'active' : 'pending' });
+    if (i < s.intervalsPerPhase - 1) arr.push({ type: 'short_break', duration: s.shortBreakDuration, status: 'pending' });
   }
   return arr;
 }
@@ -329,7 +363,7 @@ function startSession() {
   }
   state.intervals = genIntervals();
   state.intervalIdx = 0;
-  state.timeRemaining = STUDY_MIN * 60;
+  state.timeRemaining = getS().studyDuration * 60;
   state.isRunning = true;
   state.activeTimerType = 'phase_intervals';
   document.getElementById('btn-start').style.display = 'none';
@@ -347,10 +381,40 @@ function toggleTimer() {
 function startTick() { stopTick(); timerInterval = setInterval(tick, 1000); }
 function stopTick() { if (timerInterval) { clearInterval(timerInterval); timerInterval = null; } }
 
+function parseScheduleTime(timeStr) {
+  const d = new Date(timeStr);
+  if (!isNaN(d.getTime())) return d;
+  // Try parsing "HH:MM AM/PM" format
+  const cleaned = timeStr.trim().toLowerCase();
+  const m = cleaned.match(/(\d{1,2}):?(\d{2})?\s*(am|pm)/);
+  if (!m) return null;
+  let hours = parseInt(m[1], 10);
+  if (m[3] === 'pm' && hours < 12) hours += 12;
+  if (m[3] === 'am' && hours === 12) hours = 0;
+  const mins = m[2] && !isNaN(parseInt(m[2], 10)) ? parseInt(m[2], 10) : 0;
+  const now = new Date();
+  const date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, mins);
+  if (date < now) date.setDate(date.getDate() + 1);
+  return date;
+}
+
 function tick() {
   if (!state.isRunning || state.tierBAlert) return;
   state.timeRemaining--;
   if (state.timeRemaining > 0) { render(); return; }
+
+  if (state.activeTimerType === 'waiting') {
+    // Waiting countdown finished — start Phase 1
+    state.isWaitingToStart = false;
+    state.waitingUntil = null;
+    state.intervals = genIntervals();
+    state.intervalIdx = 0;
+    state.timeRemaining = getS().studyDuration * 60;
+    state.isRunning = true;
+    state.activeTimerType = 'phase_intervals';
+    render();
+    return;
+  }
 
   const cur = state.intervals[state.intervalIdx];
   if (cur) {
@@ -394,11 +458,10 @@ function dismissAlert() {
   state.tierBAlert = false;
 
   if (state.tierBType === 'phase_end') {
-    // Check if there's a Big Break after this phase
     const hasBB = state.schedule.some(b => b.type === 'big_break' && b.phaseIndex === state.currentPhaseIdx);
     if (hasBB) {
       state.activeTimerType = 'big_break';
-      state.timeRemaining = BIG_BREAK_MIN * 60;
+      state.timeRemaining = getS().bigBreakDuration * 60;
       state.isRunning = true;
       startTick();
     } else {
@@ -408,15 +471,49 @@ function dismissAlert() {
         state.currentPhaseIdx = next;
         state.intervals = genIntervals();
         state.intervalIdx = 0;
-        state.timeRemaining = STUDY_MIN * 60;
+        state.timeRemaining = getS().studyDuration * 60;
         state.activeTimerType = 'phase_intervals';
         state.isRunning = true;
         startTick();
       } else {
-        state.activeTimerType = null;
-        document.getElementById('btn-pause').style.display = 'none';
-        document.getElementById('btn-start').style.display = '';
+        showSessionComplete();
       }
+    }
+  } else {
+    const next = state.currentPhaseIdx + 1;
+    const nextPhase = state.schedule.find(b => b.type === 'phase' && b.phaseIndex === next);
+    if (nextPhase) {
+      state.currentPhaseIdx = next;
+      state.intervals = genIntervals();
+      state.intervalIdx = 0;
+      state.timeRemaining = getS().studyDuration * 60;
+      state.activeTimerType = 'phase_intervals';
+      state.isRunning = true;
+      startTick();
+    } else {
+      showSessionComplete();
+    }
+  }
+  state.tierBType = null;
+}
+
+function showSessionComplete() {
+  state.activeTimerType = null;
+  state.isSessionComplete = true;
+  state.sessionCompleteStats = {
+    totalMinutes: Math.round(state.totalStudiedSeconds / 60),
+    phasesDone: state.currentPhaseIdx + 1,
+  };
+  document.getElementById('btn-pause').style.display = 'none';
+  document.getElementById('btn-start').style.display = '';
+  render();
+}
+
+function dismissSessionComplete() {
+  state.isSessionComplete = false;
+  state.sessionCompleteStats = null;
+  render();
+}
     }
   } else {
     const next = state.currentPhaseIdx + 1;
@@ -441,7 +538,7 @@ function dismissAlert() {
 
 function saveApiKey() {
   const val = document.getElementById('api-key-input').value.trim();
-  if (val) { localStorage.setItem('groq_api_key', val); GROQ_API_KEY = val; }
+  if (val) { localStorage.setItem('gemini_api_key', val); GEMINI_API_KEY = val; }
 }
 function clearSchedule() {
   if (!state.schedule.length && state.totalStudiedSeconds === 0) return;
@@ -453,6 +550,9 @@ function clearSchedule() {
   state.timeRemaining = 25 * 60;
   state.isRunning = false;
   state.activeTimerType = null;
+  state.isWaitingToStart = false;
+  state.waitingUntil = null;
+  state.suggestion = null;
   state.tierBAlert = false;
   state.tierBType = null;
   stopTick();
@@ -490,6 +590,7 @@ function finishEarly() {
 
 // ==================== RENDER ====================
 function render() {
+  const isWaiting = state.activeTimerType === 'waiting' && state.isWaitingToStart;
   const mins = Math.floor(state.timeRemaining / 60);
   const secs = state.timeRemaining % 60;
   const display = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
@@ -498,7 +599,8 @@ function render() {
   timerEl.className = state.timeRemaining <= 60 ? 'timer-text warning' : 'timer-text';
 
   let label = 'READY', status = '';
-  if (state.activeTimerType === 'big_break') { label = 'BIG BREAK'; status = 'RESTING'; }
+  if (isWaiting) { label = 'STARTS IN'; status = 'WAITING'; }
+  else if (state.activeTimerType === 'big_break') { label = 'BIG BREAK'; status = 'RESTING'; }
   else if (state.activeTimerType === 'phase_intervals') {
     const iv = state.intervals[state.intervalIdx];
     if (iv) label = iv.type === 'study' ? 'STUDY' : 'SHORT BREAK';
@@ -508,16 +610,62 @@ function render() {
   document.getElementById('interval-label').textContent = label;
   document.getElementById('status-focus').textContent = status || 'READY';
 
-  const totalSecs = state.activeTimerType === 'big_break' ? BIG_BREAK_MIN * 60
+  const totalSecs = isWaiting ? 1
+    : state.activeTimerType === 'big_break' ? BIG_BREAK_MIN * 60
     : (state.intervals[state.intervalIdx]?.duration || 25) * 60;
-  const progress = totalSecs > 0 ? state.timeRemaining / totalSecs : 0;
+  const progress = isWaiting ? 0 : state.timeRemaining / totalSecs;
   const circ = 2 * Math.PI * 118;
   document.getElementById('progress-circle').setAttribute('stroke-dashoffset', circ * progress);
-  document.getElementById('progress-circle').style.stroke = state.timeRemaining <= 60 ? '#ef4444'
+  document.getElementById('progress-circle').style.stroke = isWaiting ? '#94a3b8'
+    : state.timeRemaining <= 60 ? '#ef4444'
     : state.activeTimerType === 'big_break' ? '#eab308' : '#2dd4bf';
 
+  // Show/hide buttons based on state
+  const btnRow = document.querySelector('.btn-row');
+  const existingSuggestion = document.getElementById('suggestion-banner');
+  if (existingSuggestion) existingSuggestion.remove();
+  if (state.suggestion && state.activeTimerType !== 'phase_intervals' && state.activeTimerType !== 'big_break') {
+    const banner = document.createElement('div');
+    banner.id = 'suggestion-banner';
+    banner.style.cssText = 'background:#1e293b;border-radius:12px;margin:16px 0 0;padding:14px 16px;border:1px solid #2dd4bf;color:#94a3b8;font-size:14px;text-align:center;line-height:1.5';
+    banner.textContent = state.suggestion;
+    btnRow.parentNode.insertBefore(banner, btnRow.nextSibling);
+  }
+
+  const btnStart = document.getElementById('btn-start');
+  const btnPause = document.getElementById('btn-pause');
+  if (isWaiting) {
+    btnStart.style.display = '';
+    btnStart.textContent = 'SKIP WAIT';
+    btnStart.className = 'btn btn-primary';
+    btnStart.onclick = skipWait;
+    btnPause.style.display = 'none';
+  } else if (state.activeTimerType === 'phase_intervals' || state.activeTimerType === 'big_break') {
+    if (state.isRunning) {
+      btnStart.style.display = 'none';
+      btnPause.style.display = '';
+      btnPause.textContent = 'PAUSE';
+      btnPause.onclick = toggleTimer;
+    } else {
+      btnStart.style.display = '';
+      btnStart.textContent = 'RESUME';
+      btnStart.className = 'btn btn-primary';
+      btnStart.onclick = toggleTimer;
+      btnPause.style.display = 'none';
+    }
+  } else {
+    btnStart.style.display = state.schedule.length ? '' : 'none';
+    btnStart.textContent = 'START';
+    btnStart.className = 'btn btn-primary';
+    btnStart.onclick = startSession;
+    btnPause.style.display = 'none';
+  }
+
   const counter = document.getElementById('interval-counter');
-  if (state.activeTimerType === 'phase_intervals') {
+  if (isWaiting) {
+    counter.textContent = `Starting at ${state.waitingUntil || '...'}`;
+    counter.style.color = '#2dd4bf';
+  } else if (state.activeTimerType === 'phase_intervals') {
     counter.textContent = `Interval ${state.intervalIdx + 1} / ${state.intervals.length}`;
     counter.style.color = '#94a3b8';
   } else if (state.activeTimerType === 'big_break') {
@@ -529,6 +677,22 @@ function render() {
   }
   renderTimeline();
   updateReport();
+}
+
+function skipWait() {
+  stopTick();
+  state.isWaitingToStart = false;
+  state.waitingUntil = null;
+  state.intervals = genIntervals();
+  state.intervalIdx = 0;
+  state.timeRemaining = STUDY_MIN * 60;
+  state.isRunning = true;
+  state.activeTimerType = 'phase_intervals';
+  const btn = document.getElementById('btn-start');
+  btn.style.display = 'none';
+  document.getElementById('btn-pause').style.display = '';
+  startTick();
+  render();
 }
 
 function renderTimeline() {
@@ -584,39 +748,83 @@ function renderTimeline() {
   document.getElementById('stats-row').style.display = 'flex';
 }
 
-// ==================== GROQ PARSER ====================
-const SYSTEM_PROMPT = `You are a multilingual schedule parser. Accept input in ANY language (English, Arabic, Urdu, French, etc.).
+// ==================== GEMINI TIME EXTRACTOR ====================
+const SYSTEM_PROMPT = `You are a multilingual study assistant. Accept input in ANY language (English, Arabic, Urdu, French, etc.).
 
-Parse the user's study schedule into JSON.
+Extract the START time and END time from the user's study schedule, and give a friendly suggestion about gym/nap/break based on total study hours today.
 
 Rules:
 - Understand natural language time expressions in any language
-- Split the total time range into sequential 2-hour (120 min) Phase blocks
-- After each Phase block, add a mandatory 30-minute Big Break
 - Return ONLY valid JSON, no markdown, no explanation
-- Use ISO 8601 strings for dates
+- Output times in 12-hour format with AM/PM (e.g. "1:00 AM", "8:00 PM")
+- Infer AM/PM from context like morning/afternoon/evening/مساء/صباح if not specified
+- If you see a range like "1 to 8", figure out the correct AM/PM from context
+- The current time and total study hours today is provided to help you infer
+- Generate a short, friendly suggestion (2 sentences max) suggesting gym / power nap / short break based on how many hours they've studied so far
+- Keep the suggestion casual like a friend would say
 
 Examples:
-- "I want to study from 3:00 PM to 7:00 PM"
-- "أريد أن أدرس من الساعة 3 إلى 7 مساءً"
-- "study block 3pm to 7pm"
+- "I want to study from 3:00 PM to 7:00 PM" → {"startTime": "3:00 PM", "endTime": "7:00 PM", "suggestion": "You've done 2 hours already — a quick gym session could wake you up before diving in!"}
+- "أريد أن أدرس من الساعة 3 إلى 7 مساءً" → {"startTime": "3:00 PM", "endTime": "7:00 PM", "suggestion": "درست ساعتين اليوم. شوي تمرين أو غفوة سريعة قبل الدراسة؟"}
+- "study 1am to 8pm" → {"startTime": "1:00 AM", "endTime": "8:00 PM", "suggestion": "Long day ahead! Power nap before you start to stay sharp."}
 
-Output format:
-{
-  "phases": [
-    {"label": "Phase 1", "startTime": "ISO", "endTime": "ISO", "duration": 120, "type": "phase", "phaseIndex": 0},
-    {"label": "Big Break", "startTime": "ISO", "endTime": "ISO", "duration": 30, "type": "big_break", "phaseIndex": 0}
-  ]
-}`;
+Output EXACTLY this format (no extra keys):
+{"startTime": "HH:MM AM/PM", "endTime": "HH:MM AM/PM", "suggestion": "..."}`;
 
-async function parseWithGroq(text) {
-  const userPrompt = `Schedule: "${text}"\nCurrent time: ${new Date().toISOString()}`;
-  let raw = await callGroq(SYSTEM_PROMPT, userPrompt);
+async function parseWithGemini(text, totalStudiedSeconds) {
+  const hoursToday = totalStudiedSeconds ? Math.round(totalStudiedSeconds / 360) / 10 : 0;
+  const prompt = `${SYSTEM_PROMPT}\n\nUser schedule: "${text}"\nCurrent time: ${new Date().toISOString()}\nTotal study hours today: ${hoursToday}h`;
+  let raw = await callGemini(prompt);
   const jm = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
   if (jm) raw = jm[1];
   const bm = raw.match(/\{[\s\S]*\}/);
-  if (!bm) throw new Error('No JSON in Groq response');
-  return JSON.parse(bm[0]);
+  if (!bm) throw new Error('No JSON in Gemini response');
+  const data = JSON.parse(bm[0]);
+  const startKey = Object.keys(data).find(k => /^start/i.test(k));
+  const endKey = Object.keys(data).find(k => /^end/i.test(k));
+  if (!startKey || !endKey) throw new Error('Missing times in response');
+  const startDate = parseTimeString2(data[startKey]);
+  const endDate = parseTimeString2(data[endKey]);
+  if (!startDate || !endDate) throw new Error('Could not parse returned times');
+  const phases = generateBlocksFromDates(startDate, endDate);
+  const suggestion = data.suggestion || data.message || data.advice || null;
+  return { phases, suggestion };
+}
+
+function parseTimeString2(str) {
+  const cleaned = str.trim().toLowerCase();
+  const m = cleaned.match(/(\d{1,2}):?(\d{2})?\s*(am|pm)/);
+  if (!m) return null;
+  let hours = parseInt(m[1], 10);
+  if (m[3] === 'pm' && hours < 12) hours += 12;
+  if (m[3] === 'am' && hours === 12) hours = 0;
+  const minutes = m[2] && !isNaN(parseInt(m[2], 10)) ? parseInt(m[2], 10) : 0;
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes);
+}
+
+function generateBlocksFromDates(startDate, endDate) {
+  const schedule = [];
+  let current = new Date(startDate), idx = 0;
+  while (current < endDate) {
+    const pe = new Date(current);
+    pe.setMinutes(pe.getMinutes() + 120);
+    const capped = pe > endDate ? endDate : pe;
+    const dur = Math.round((capped - current) / 60000);
+    if (dur <= 0) break;
+    schedule.push({ id: `phase-${idx}`, label: `Phase ${idx+1}`, startTime: fmtTime(current), endTime: fmtTime(capped), duration: dur, type: 'phase', phaseIndex: idx });
+    current = new Date(capped);
+    const afterBreak = new Date(current);
+    afterBreak.setMinutes(afterBreak.getMinutes() + 30 + 25);
+    if (afterBreak <= endDate) {
+      const be = new Date(current);
+      be.setMinutes(be.getMinutes() + 30);
+      schedule.push({ id: `big-break-${idx}`, label: 'Big Break', startTime: fmtTime(current), endTime: fmtTime(be), duration: 30, type: 'big_break', phaseIndex: idx });
+      current = be;
+    }
+    idx++;
+  }
+  return schedule;
 }
 
 function fmtTime(d) {
@@ -850,28 +1058,47 @@ async function sendCommand() {
       return;
     }
 
-    // Try Groq first
+    // Try Gemini first
     let schedule;
+    let suggestion = null;
     try {
-      const res = await parseWithGroq(text);
-      schedule = normalizeSchedule(res.phases.map((p, i) => ({
-        id: p.id || `${p.type}-${i}`,
-        label: p.label,
-        startTime: p.startTime,
-        endTime: p.endTime,
-        duration: p.duration,
-        type: p.type,
-        phaseIndex: p.phaseIndex ?? i,
-      })));
-    } catch (groqErr) {
-      console.warn('Groq failed, using local parser:', groqErr.message);
+      const result = await parseWithGemini(text, state.totalStudiedSeconds);
+      schedule = normalizeSchedule(result.phases);
+      suggestion = result.suggestion;
+    } catch (geminiErr) {
+      console.warn('Gemini failed, using local parser:', geminiErr.message);
       schedule = normalizeSchedule(localParse(text));
     }
 
     state.schedule = schedule;
+    state.suggestion = suggestion;
     state.currentPhaseIdx = 0;
     state.consoleInput = text;
     input.value = '';
+    state.isWaitingToStart = false;
+    state.waitingUntil = null;
+
+    // Check if first phase starts in the future
+    const firstPhase = schedule.find(b => b.type === 'phase');
+    if (firstPhase) {
+      const now = new Date();
+      const startDate = parseScheduleTime(firstPhase.startTime);
+      if (startDate) {
+        const secsUntil = Math.round((startDate - now) / 1000);
+        if (secsUntil > 10) {
+          state.isWaitingToStart = true;
+          state.waitingUntil = firstPhase.startTime;
+          state.isRunning = true;
+          state.activeTimerType = 'waiting';
+          state.timeRemaining = secsUntil;
+          startTick();
+          render();
+          switchTab('study');
+          input.value = '';
+          return;
+        }
+      }
+    }
 
     render();
 

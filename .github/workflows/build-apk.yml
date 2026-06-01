@@ -24,10 +24,10 @@ jobs:
         with:
           node-version: 22
 
-      - name: Inject Groq API key
+      - name: Inject Gemini API key
         run: |
           cat > src/config.ts << 'EOF'
-          export const GROQ_API_KEY = '${{ secrets.GROQ_API_KEY }}';
+          export const GEMINI_API_KEY = '${{ secrets.GEMINI_API_KEY }}';
           EOF
 
       - name: Install Android SDK components

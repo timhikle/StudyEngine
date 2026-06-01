@@ -1,83 +1,69 @@
 import { ParsedSchedule, ScheduleBlock } from '../types';
 import { parseTimeString, getNowISO } from '../utils/time';
-import { GROQ_API_KEY } from '../config';
+import { generateScheduleBlocks } from '../utils/schedule';
+import { GEMINI_API_KEY } from '../config';
 
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GEMINI_MODEL = 'gemini-2.5-flash-lite';
 
-let apiKey = GROQ_API_KEY;
-export function setGroqApiKey(key: string) { apiKey = key; }
+let apiKey = GEMINI_API_KEY;
+export function setGeminiApiKey(key: string) { apiKey = key; }
 
-const SYSTEM_PROMPT = `You are a multilingual schedule parser. Accept input in ANY language (English, Arabic, Urdu, French, etc.).
+const SYSTEM_PROMPT = `You are a multilingual study assistant. Accept input in ANY language (English, Arabic, Urdu, French, etc.).
 
-Parse the user's study schedule into JSON.
+Extract the START time and END time from the user's study schedule, and give a friendly suggestion about gym/nap/break based on total study hours today.
 
 Rules:
 - Understand natural language time expressions in any language
-- Split the total time range into sequential 2-hour (120 min) Phase blocks
-- After each Phase block, add a mandatory 30-minute Big Break
 - Return ONLY valid JSON, no markdown, no explanation
-- Use ISO 8601 strings for dates
-- Current time is provided; infer AM/PM from context if not specified
+- Output times in 12-hour format with AM/PM (e.g. "1:00 AM", "8:00 PM")
+- Infer AM/PM from context like morning/afternoon/evening/مساء/صباح if not specified
+- If you see a range like "1 to 8", figure out the correct AM/PM from context
+- The current time and total study hours today is provided to help you infer
+- Generate a short, friendly suggestion (2 sentences max) suggesting gym / power nap / short break based on how many hours they've studied so far
+- Keep the suggestion casual like a friend would say
 
-Examples of accepted input:
-- "I want to study from 3:00 PM to 7:00 PM"
-- "أريد أن أدرس من الساعة 3 إلى 7 مساءً"
-- "راح أدرس من ٣ إلى ٧ العصر"
-- "study block 3pm to 7pm"
-- "I wanna study 3 to 7"
+Examples:
+- "I want to study from 3:00 PM to 7:00 PM" → {"startTime": "3:00 PM", "endTime": "7:00 PM", "suggestion": "You've done 2 hours already — a quick gym session could wake you up before diving in!"}
+- "أريد أن أدرس من الساعة 3 إلى 7 مساءً" → {"startTime": "3:00 PM", "endTime": "7:00 PM", "suggestion": "درست ساعتين اليوم. شوي تمرين أو غفوة سريعة قبل الدراسة؟"}
+- "study 1am to 8pm" → {"startTime": "1:00 AM", "endTime": "8:00 PM", "suggestion": "Long day ahead! Power nap before you start to stay sharp."}
+- "study from 1 to 8 in the evening" → {"startTime": "1:00 PM", "endTime": "8:00 PM", "suggestion": "You've been at it for 3 hours. Take a 15-min break first — your brain needs it!"}
 
-Output format:
-{
-  "phases": [
-    {
-      "label": "Phase 1",
-      "startTime": "ISO string",
-      "endTime": "ISO string",
-      "duration": 120,
-      "type": "phase",
-      "phaseIndex": 0
-    },
-    {
-      "label": "Big Break",
-      "startTime": "ISO string",
-      "endTime": "ISO string",
-      "duration": 30,
-      "type": "big_break",
-      "phaseIndex": 0
-    }
-  ]
-}`;
+Output EXACTLY this format (no extra keys):
+{"startTime": "HH:MM AM/PM", "endTime": "HH:MM AM/PM", "suggestion": "..."}`;
 
-async function callGroq(input: string): Promise<string> {
+async function callGemini(input: string, totalStudiedSeconds?: number): Promise<string> {
   if (!apiKey) {
-    throw new Error('GROQ_API_KEY not configured. Set it with setGroqApiKey().');
+    throw new Error('Gemini API key not configured. Set it with setGeminiApiKey().');
   }
+  const hoursToday = totalStudiedSeconds ? Math.round(totalStudiedSeconds / 360) / 10 : 0;
 
-  const response = await fetch(GROQ_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `Schedule: "${input}"\nCurrent time: ${new Date().toISOString()}` },
-      ],
-      temperature: 0.1,
-      max_tokens: 1024,
-    }),
-  });
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: `${SYSTEM_PROMPT}\n\nUser schedule: "${input}"\nCurrent time: ${new Date().toISOString()}\nTotal study hours today: ${hoursToday}h` }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 1024,
+        },
+      }),
+    }
+  );
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Groq API error: ${response.status} ${errorText}`);
+    throw new Error(`Gemini API error: ${response.status} ${errorText}`);
   }
 
   const data = await response.json();
-  const text = data?.choices?.[0]?.message?.content || '';
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
   return text;
 }
 
@@ -256,22 +242,21 @@ function fallbackParse(input: string): ParsedSchedule {
   return { phases, originalInput: input };
 }
 
-export async function parseSchedule(input: string): Promise<ParsedSchedule> {
+export async function parseSchedule(input: string, totalStudiedSeconds?: number): Promise<ParsedSchedule> {
   try {
-    const rawResponse = await callGroq(input);
+    const rawResponse = await callGemini(input, totalStudiedSeconds);
     const jsonStr = tryExtractJSON(rawResponse);
     const data = JSON.parse(jsonStr);
-    const phases: ScheduleBlock[] = (data.phases || []).map((p: any, i: number) => ({
-      id: p.id || `${p.type}-${i}`,
-      label: p.label,
-      startTime: p.startTime,
-      endTime: p.endTime,
-      duration: p.duration,
-      type: p.type || 'phase',
-      status: 'pending',
-      phaseIndex: p.phaseIndex ?? i,
-    }));
-    return { phases, originalInput: input };
+    const startKey = Object.keys(data).find(k => /^start/i.test(k));
+    const endKey = Object.keys(data).find(k => /^end/i.test(k));
+    const suggestion = data.suggestion || data.message || data.advice || null;
+    if (!startKey || !endKey) throw new Error('Missing times');
+    const startDate = parseTimeString(data[startKey]);
+    const endDate = parseTimeString(data[endKey]);
+    if (!startDate || !endDate) throw new Error('Could not parse times');
+    const phases = generateScheduleBlocks(startDate.toISOString(), endDate.toISOString());
+    if (phases.length === 0) throw new Error('No phases generated');
+    return { phases, originalInput: input, suggestion };
   } catch {
     return fallbackParse(input);
   }

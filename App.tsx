@@ -6,14 +6,16 @@ import { BackgroundService } from './src/services/background';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { ConsoleScreen } from './src/screens/ConsoleScreen';
 import { ScheduleScreen } from './src/screens/ScheduleScreen';
+import { SettingsScreen } from './src/screens/SettingsScreen';
 import { NotificationBar } from './src/components/NotificationBar';
 
-type Screen = 'home' | 'console' | 'schedule';
+type Screen = 'home' | 'console' | 'schedule' | 'settings';
 
 const TABS: { key: Screen; icon: string; label: string }[] = [
   { key: 'home', icon: '◉', label: 'Study' },
   { key: 'console', icon: '▶', label: 'Console' },
   { key: 'schedule', icon: '☰', label: 'Schedule' },
+  { key: 'settings', icon: '⚙', label: 'Settings' },
 ];
 
 const App: React.FC = () => {
@@ -32,6 +34,8 @@ const App: React.FC = () => {
         return <ConsoleScreen />;
       case 'schedule':
         return <ScheduleScreen />;
+      case 'settings':
+        return <SettingsScreen />;
     }
   };
 

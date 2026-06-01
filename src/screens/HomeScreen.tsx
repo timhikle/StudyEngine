@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, Modal } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../theme';
 import { useStore } from '../store/useStore';
-import { BIG_BREAK_DURATION } from '../utils/schedule';
+import { formatTime, formatTimeLabel } from '../utils/time';
 import { TimerDisplay } from '../components/TimerDisplay';
 import { ProgressRing } from '../components/ProgressRing';
 
@@ -14,25 +14,36 @@ export const HomeScreen: React.FC = () => {
   const bigBreakTimeRemaining = useStore((s) => s.bigBreakTimeRemaining);
   const isRunning = useStore((s) => s.isRunning);
   const activeTimerType = useStore((s) => s.activeTimerType);
+  const isWaitingToStart = useStore((s) => s.isWaitingToStart);
+  const waitingUntil = useStore((s) => s.waitingUntil);
   const startTimer = useStore((s) => s.startTimer);
   const pauseTimer = useStore((s) => s.pauseTimer);
+  const clearSchedule = useStore((s) => s.clearSchedule);
+  const isSessionComplete = useStore((s) => s.isSessionComplete);
+  const sessionCompleteStats = useStore((s) => s.sessionCompleteStats);
+  const dismissSessionComplete = useStore((s) => s.dismissSessionComplete);
+  const settings = useStore((s) => s.settings);
 
+  const suggestion = useStore((s) => s.suggestion);
+  const isWaiting = isWaitingToStart && activeTimerType === 'waiting';
   const isBigBreak = activeTimerType === 'big_break';
   const isPhaseIntervals = activeTimerType === 'phase_intervals';
   const currentInterval = intervals[currentIntervalIndex];
   const totalSeconds = isBigBreak
-    ? BIG_BREAK_DURATION * 60
+    ? settings.bigBreakDuration * 60
     : currentInterval
       ? currentInterval.duration * 60
       : 1;
   const remaining = isBigBreak ? bigBreakTimeRemaining : timeRemaining;
   const progress = totalSeconds > 0 ? 1 - remaining / totalSeconds : 0;
 
-  const intervalLabel = isBigBreak
-    ? 'BIG BREAK'
-    : currentInterval
-      ? currentInterval.type === 'study' ? 'STUDY' : 'SHORT BREAK'
-      : 'READY';
+  const intervalLabel = isWaiting
+    ? 'STARTS IN'
+    : isBigBreak
+      ? 'BIG BREAK'
+      : currentInterval
+        ? currentInterval.type === 'study' ? 'STUDY' : 'SHORT BREAK'
+        : 'READY';
 
   const hasSchedule = schedule.length > 0;
 
@@ -49,26 +60,62 @@ export const HomeScreen: React.FC = () => {
           <ProgressRing
             size={260}
             strokeWidth={8}
-            progress={progress}
+            progress={isWaiting ? 0 : progress}
             color={
-              isBigBreak
-                ? colors.warning
-                : remaining <= 60
-                  ? colors.alert
-                  : colors.accent
+              isWaiting
+                ? colors.secondary
+                : isBigBreak
+                  ? colors.warning
+                  : remaining <= 60
+                    ? colors.alert
+                    : colors.accent
             }
           >
-            <TimerDisplay
-              timeRemaining={remaining}
-              intervalLabel={intervalLabel}
-              isRunning={isRunning}
-              progress={progress}
-            />
+            {isWaiting ? (
+              <View style={styles.waitingContent}>
+                <Text style={styles.waitingLabel}>STARTS IN</Text>
+                <Text style={styles.waitingTime}>{formatTime(timeRemaining)}</Text>
+                <Text style={styles.waitingStartAt}>
+                  Starting at {waitingUntil ? formatTimeLabel(waitingUntil) : ''}
+                </Text>
+              </View>
+            ) : (
+              <TimerDisplay
+                timeRemaining={remaining}
+                intervalLabel={intervalLabel}
+                isRunning={isRunning}
+                progress={progress}
+              />
+            )}
           </ProgressRing>
         </View>
 
+        {suggestion && !isWaiting && (
+          <View style={styles.suggestionBanner}>
+            <Text style={styles.suggestionText}>{suggestion}</Text>
+          </View>
+        )}
+
         <View style={styles.controls}>
-          {hasSchedule && isRunning && (
+          {isWaiting && (
+            <View style={styles.waitingButtons}>
+              <TouchableOpacity
+                style={styles.startButton}
+                onPress={startTimer}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.controlText, { color: colors.canvas }]}>SKIP WAIT</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={clearSchedule}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.controlText, { color: colors.alert }]}>CANCEL</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          {!isWaiting && hasSchedule && isRunning && (
             <TouchableOpacity
               style={styles.controlButton}
               onPress={pauseTimer}
@@ -77,7 +124,7 @@ export const HomeScreen: React.FC = () => {
               <Text style={styles.controlText}>PAUSE</Text>
             </TouchableOpacity>
           )}
-          {hasSchedule && !isRunning && activeTimerType && (
+          {!isWaiting && hasSchedule && !isRunning && activeTimerType && (
             <TouchableOpacity
               style={[styles.controlButton, styles.startButton]}
               onPress={startTimer}
@@ -91,6 +138,11 @@ export const HomeScreen: React.FC = () => {
         </View>
 
         <View style={styles.intervalInfo}>
+          {isWaiting && (
+            <Text style={styles.phaseInfo}>
+              Schedule set — auto-starts at {waitingUntil ? formatTimeLabel(waitingUntil) : ''}
+            </Text>
+          )}
           {isPhaseIntervals && (
             <Text style={styles.intervalCount}>
               Interval {currentIntervalIndex + 1} / {intervals.length}
@@ -105,6 +157,30 @@ export const HomeScreen: React.FC = () => {
             <Text style={styles.phaseInfo}>Use Console to set a schedule</Text>
           )}
         </View>
+
+        {/* Session Complete Modal */}
+        {isSessionComplete && sessionCompleteStats && (
+          <View style={styles.completeOverlay}>
+            <View style={styles.completeCard}>
+              <Text style={styles.completeIcon}>🎉</Text>
+              <Text style={styles.completeTitle}>SESSION COMPLETE</Text>
+              <View style={styles.completeStats}>
+                <View style={styles.completeStat}>
+                  <Text style={styles.completeStatNum}>{sessionCompleteStats.phasesDone}</Text>
+                  <Text style={styles.completeStatLabel}>PHASES</Text>
+                </View>
+                <View style={styles.completeDivider} />
+                <View style={styles.completeStat}>
+                  <Text style={styles.completeStatNum}>{Math.floor(sessionCompleteStats.totalMinutes / 60)}h {sessionCompleteStats.totalMinutes % 60}m</Text>
+                  <Text style={styles.completeStatLabel}>STUDIED</Text>
+                </View>
+              </View>
+              <TouchableOpacity style={styles.completeBtn} onPress={dismissSessionComplete} activeOpacity={0.8}>
+                <Text style={styles.completeBtnText}>DISMISS</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -154,9 +230,42 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.cardBorder,
   },
+  waitingContent: {
+    alignItems: 'center',
+  },
+  waitingLabel: {
+    ...typography.label,
+    color: colors.secondary,
+    marginBottom: 8,
+  },
+  waitingTime: {
+    ...typography.timer,
+    color: colors.activeText,
+    marginVertical: 8,
+  },
+  waitingStartAt: {
+    ...typography.bodySmall,
+    color: colors.accent,
+  },
+  waitingButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
   startButton: {
     backgroundColor: colors.accent,
+    borderRadius: borderRadius.full,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xxl,
+    borderWidth: 1,
     borderColor: colors.accent,
+  },
+  cancelButton: {
+    backgroundColor: 'transparent',
+    borderRadius: borderRadius.full,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xxl,
+    borderWidth: 1,
+    borderColor: colors.alert,
   },
   controlText: {
     ...typography.body,
@@ -169,6 +278,20 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
     paddingHorizontal: spacing.lg,
   },
+  suggestionBanner: {
+    backgroundColor: '#1e293b',
+    borderRadius: 12,
+    marginHorizontal: spacing.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: '#2dd4bf',
+    marginBottom: spacing.md,
+  },
+  suggestionText: {
+    ...typography.body,
+    color: '#94a3b8',
+    textAlign: 'center',
+  },
   intervalCount: {
     ...typography.bodySmall,
     color: colors.secondary,
@@ -179,4 +302,32 @@ const styles = StyleSheet.create({
     color: colors.secondary,
     opacity: 0.7,
   },
+  completeOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  completeCard: {
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    width: '85%',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  completeIcon: { fontSize: 48, marginBottom: spacing.md },
+  completeTitle: { ...typography.h2, color: colors.accent, marginBottom: spacing.lg },
+  completeStats: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg },
+  completeStat: { alignItems: 'center', minWidth: 100 },
+  completeStatNum: { ...typography.h2, color: colors.activeText, fontSize: 24 },
+  completeStatLabel: { ...typography.label, color: colors.secondary },
+  completeDivider: { width: 1, height: 40, backgroundColor: colors.cardBorder, marginHorizontal: spacing.lg },
+  completeBtn: {
+    backgroundColor: colors.accent, borderRadius: borderRadius.full,
+    paddingVertical: spacing.sm, paddingHorizontal: spacing.xxl,
+  },
+  completeBtnText: { ...typography.body, color: colors.canvas, fontWeight: '700', letterSpacing: 2 },
 });

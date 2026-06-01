@@ -2,7 +2,7 @@ export type BlockType = 'phase' | 'big_break';
 export type IntervalType = 'study' | 'short_break';
 export type PhaseStatus = 'pending' | 'active' | 'completed';
 export type TierBType = 'phase_end' | 'big_break_end' | null;
-export type ActiveTimerType = 'phase_intervals' | 'big_break' | null;
+export type ActiveTimerType = 'phase_intervals' | 'big_break' | 'waiting' | null;
 
 export interface ScheduleBlock {
   id: string;
@@ -25,9 +25,10 @@ export interface StudyInterval {
 export interface ParsedSchedule {
   phases: ScheduleBlock[];
   originalInput: string;
+  suggestion?: string;
 }
 
-export interface GroqResponse {
+export interface GeminiResponse {
   schedule: ParsedSchedule;
   raw: string;
 }
@@ -35,6 +36,16 @@ export interface GroqResponse {
 export interface StudySession {
   phaseIndex: number;
   completedAt: string;
+}
+
+export interface AppSettings {
+  studyDuration: number;       // minutes per study interval
+  shortBreakDuration: number;  // minutes per short break
+  phaseDuration: number;       // minutes per phase
+  bigBreakDuration: number;    // minutes per big break
+  intervalsPerPhase: number;   // study intervals before big break
+  soundEnabled: boolean;       // Tier A (interval transition) sound
+  tierBEnabled: boolean;      // Tier B (phase/break end) sound
 }
 
 export interface AppState {
@@ -46,15 +57,21 @@ export interface AppState {
   bigBreakTimeRemaining: number;
   isRunning: boolean;
   activeTimerType: ActiveTimerType;
+  isWaitingToStart: boolean;
+  waitingUntil: string | null;
   tierBAlert: boolean;
   tierBType: TierBType;
   consoleInput: string;
+  suggestion: string | null;
   isConsoleLocked: boolean;
   isParsing: boolean;
   error: string | null;
   version: number;
   totalStudiedSeconds: number;
   sessionHistory: StudySession[];
+  settings: AppSettings;
+  isSessionComplete: boolean;
+  sessionCompleteStats: { totalMinutes: number; phasesDone: number } | null;
 
   setConsoleInput: (input: string) => void;
   sendConsoleCommand: (input: string) => Promise<void>;
@@ -69,6 +86,9 @@ export interface AppState {
   extendBreak: (phaseIndex: number, minutes: number) => void;
   delayPhase: (phaseIndex: number, minutes: number) => void;
   clearSchedule: () => void;
+  skipWait: () => void;
   addStudiedSeconds: (seconds: number) => void;
   syncFromService: () => Promise<void>;
+  updateSettings: (settings: Partial<AppSettings>) => void;
+  dismissSessionComplete: () => void;
 }

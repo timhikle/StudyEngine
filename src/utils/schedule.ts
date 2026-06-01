@@ -13,8 +13,12 @@ export function buildPhaseLabel(index: number): string {
 
 export function generateScheduleBlocks(
   startTime: string,
-  endTime: string
+  endTime: string,
+  opts?: { phaseDuration?: number; bigBreakDuration?: number; studyDuration?: number }
 ): ScheduleBlock[] {
+  const pd = opts?.phaseDuration ?? PHASE_DURATION;
+  const bbd = opts?.bigBreakDuration ?? BIG_BREAK_DURATION;
+  const sd = opts?.studyDuration ?? STUDY_DURATION;
   const blocks: ScheduleBlock[] = [];
   const start = new Date(startTime);
   const end = new Date(endTime);
@@ -23,7 +27,7 @@ export function generateScheduleBlocks(
 
   while (current < end) {
     const phaseEnd = new Date(current);
-    phaseEnd.setMinutes(phaseEnd.getMinutes() + PHASE_DURATION);
+    phaseEnd.setMinutes(phaseEnd.getMinutes() + pd);
 
     const adjustedEnd = phaseEnd > end ? end : phaseEnd;
     const actualDuration = Math.round(
@@ -46,20 +50,20 @@ export function generateScheduleBlocks(
     current = new Date(adjustedEnd);
 
     // Only add Big Break between phases, not after the last one
-    // Require at least one full study interval (25 min) to fit after the break
+    // Require at least one full study interval to fit after the break
     const afterBreak = new Date(current);
-    afterBreak.setMinutes(afterBreak.getMinutes() + BIG_BREAK_DURATION + STUDY_DURATION);
+    afterBreak.setMinutes(afterBreak.getMinutes() + bbd + sd);
     if (afterBreak <= end) {
       const bigBreakStart = new Date(current);
       const bigBreakEnd = new Date(bigBreakStart);
-      bigBreakEnd.setMinutes(bigBreakEnd.getMinutes() + BIG_BREAK_DURATION);
+      bigBreakEnd.setMinutes(bigBreakEnd.getMinutes() + bbd);
 
       blocks.push({
         id: `big-break-${phaseIndex}`,
         label: 'Big Break',
         startTime: bigBreakStart.toISOString(),
         endTime: bigBreakEnd.toISOString(),
-        duration: BIG_BREAK_DURATION,
+        duration: bbd,
         type: 'big_break',
         status: 'pending',
         phaseIndex,
@@ -104,19 +108,24 @@ export function normalizeSchedule(blocks: ScheduleBlock[]): ScheduleBlock[] {
   return final;
 }
 
-export function generateIntervals(): StudyInterval[] {
+export function generateIntervals(
+  opts?: { studyDuration?: number; shortBreakDuration?: number; intervalsPerPhase?: number }
+): StudyInterval[] {
+  const sd = opts?.studyDuration ?? STUDY_DURATION;
+  const sbd = opts?.shortBreakDuration ?? SHORT_BREAK_DURATION;
+  const ipp = opts?.intervalsPerPhase ?? INTERVALS_PER_PHASE;
   const intervals: StudyInterval[] = [];
-  for (let i = 0; i < INTERVALS_PER_PHASE; i++) {
+  for (let i = 0; i < ipp; i++) {
     intervals.push({
       type: 'study',
-      duration: STUDY_DURATION,
+      duration: sd,
       elapsed: 0,
       status: 'pending',
     });
-    if (i < INTERVALS_PER_PHASE - 1) {
+    if (i < ipp - 1) {
       intervals.push({
         type: 'short_break',
-        duration: SHORT_BREAK_DURATION,
+        duration: sbd,
         elapsed: 0,
         status: 'pending',
       });

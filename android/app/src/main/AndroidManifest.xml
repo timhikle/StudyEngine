@@ -30,6 +30,9 @@
         </intent-filter>
       </activity>
 
-      <service android:name=".TimerService" android:exported="false" />
+      <service android:name=".TimerService" android:exported="false" android:foregroundServiceType="specialUse">
+        <property android:name="android.app.PROPERTY_FOREGROUND_SERVICE_SPECIAL_USE"
+          android:value="Study timer that continues counting when app is in background" />
+      </service>
     </application>
 </manifest>
