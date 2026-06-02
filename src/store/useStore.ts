@@ -18,6 +18,15 @@ import { BackgroundService } from '../services/background';
 
 const DEBOUNCE_MS = 2000;
 
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function addToDailyHistory(state: AppState, seconds: number): Record<string, number> {
+  const key = todayKey();
+  return { ...state.dailyHistory, [key]: (state.dailyHistory[key] || 0) + seconds };
+}
+
 function getNextPhaseSchedule(
   schedule: ScheduleBlock[],
   currentPhaseIndex: number,
@@ -53,6 +62,7 @@ export const useStore = create<AppState>((set, get) => ({
   error: null,
   version: 0,
   totalStudiedSeconds: 0,
+  dailyHistory: {},
   sessionHistory: [],
   isSessionComplete: false,
   sessionCompleteStats: null,
@@ -180,6 +190,7 @@ export const useStore = create<AppState>((set, get) => ({
         tierBAlert: true,
         tierBType: 'phase_end',
         totalStudiedSeconds: state.totalStudiedSeconds + added,
+        dailyHistory: addToDailyHistory(state, added),
         sessionHistory: [...state.sessionHistory, { phaseIndex: state.currentPhaseIndex, completedAt: new Date().toISOString() }],
         version: state.version + 1,
       });
@@ -197,6 +208,7 @@ export const useStore = create<AppState>((set, get) => ({
       currentIntervalIndex: nextIndex,
       timeRemaining: nextDuration,
       totalStudiedSeconds: state.totalStudiedSeconds + added,
+      dailyHistory: addToDailyHistory(state, added),
       version: state.version + 1,
     });
     BackgroundService.start(nextDuration, state.activeTimerType!);
@@ -396,7 +408,11 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   addStudiedSeconds: (seconds: number) => {
-    set((s) => ({ totalStudiedSeconds: s.totalStudiedSeconds + seconds, version: s.version + 1 }));
+    set((s) => ({
+      totalStudiedSeconds: s.totalStudiedSeconds + seconds,
+      dailyHistory: addToDailyHistory(s, seconds),
+      version: s.version + 1,
+    }));
   },
 
   syncFromService: async () => {

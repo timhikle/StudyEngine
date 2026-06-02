@@ -68,6 +68,7 @@ export interface AppState {
   error: string | null;
   version: number;
   totalStudiedSeconds: number;
+  dailyHistory: Record<string, number>;  // "YYYY-MM-DD" → seconds studied
   sessionHistory: StudySession[];
   settings: AppSettings;
   isSessionComplete: boolean;

@@ -1,16 +1,31 @@
-import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, StatusBar, TouchableOpacity, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, StatusBar, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { colors, typography, spacing } from '../theme';
 import { useStore } from '../store/useStore';
 import { PhaseTimeline } from '../components/PhaseTimeline';
+import { StatsScreen } from './StatsScreen';
 
 export const ScheduleScreen: React.FC = () => {
+  const [showStats, setShowStats] = useState(false);
   const schedule = useStore((s) => s.schedule);
   const currentPhaseIndex = useStore((s) => s.currentPhaseIndex);
   const totalStudiedSeconds = useStore((s) => s.totalStudiedSeconds);
   const sessionCount = useStore((s) => s.sessionHistory.length);
   const clearSchedule = useStore((s) => s.clearSchedule);
   const version = useStore((s) => s.version);
+
+  if (showStats) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.canvas }}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setShowStats(false)} style={styles.backBtn}>
+            <Text style={styles.backBtnText}>← Back</Text>
+          </TouchableOpacity>
+        </View>
+        <StatsScreen embedded />
+      </View>
+    );
+  }
 
   const phaseBlocks = schedule.filter((b) => b.type === 'phase');
   const totalStudyMinutes = phaseBlocks.reduce((acc, b) => acc + b.duration, 0);
@@ -40,11 +55,16 @@ export const ScheduleScreen: React.FC = () => {
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Schedule</Text>
-          {schedule.length > 0 && (
-            <TouchableOpacity onPress={handleClear} style={styles.clearBtn}>
-              <Text style={styles.clearBtnText}>🗑 مسح</Text>
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            <TouchableOpacity onPress={() => setShowStats(true)} style={styles.statsBtn}>
+              <Text style={styles.statsBtnText}>📊 Stats</Text>
             </TouchableOpacity>
-          )}
+            {schedule.length > 0 && (
+              <TouchableOpacity onPress={handleClear} style={styles.clearBtn}>
+                <Text style={styles.clearBtnText}>🗑 مسح</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {hasData && (
@@ -152,6 +172,27 @@ const styles = StyleSheet.create({
   clearBtnText: {
     color: colors.alert,
     fontSize: 12,
+    fontWeight: '600',
+  },
+  statsBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  statsBtnText: {
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  backBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+  },
+  backBtnText: {
+    color: colors.accent,
+    fontSize: 14,
     fontWeight: '600',
   },
   reportCard: {
