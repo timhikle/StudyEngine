@@ -1,0 +1,32 @@
+{
+  "name": "phase-study",
+  "version": "1.0.0",
+  "description": "Phase Study - AI-Powered Study Timer",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable",
+    "build:dir": "electron-builder --win --dir"
+  },
+  "build": {
+    "appId": "com.studyengine.desktop",
+    "productName": "Phase Study",
+    "icon": "assets/icon.png",
+    "target": [
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ],
+    "win": {
+      "signAndEditExecutable": false
+    },
+    "directories": {
+      "output": "dist"
+    }
+  },
+  "devDependencies": {
+    "electron": "41.3.0",
+    "electron-builder": "^25.0.0"
+  }
+}

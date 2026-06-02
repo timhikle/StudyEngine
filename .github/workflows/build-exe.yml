@@ -1,0 +1,31 @@
+name: Build EXE
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'desktop/**'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build portable EXE
+        run: npm run build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Phase-Study-Portable
+          path: desktop/dist/*.exe

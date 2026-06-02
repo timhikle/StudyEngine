@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase Study</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --canvas: #0f172a;
+  --card: #1e293b;
+  --accent: #2dd4bf;
+  --secondary: #94a3b8;
+  --active: #f8fafc;
+  --alert: #ef4444;
+  --warning: #eab308;
+  --success: #22c55e;
+  --radius: 12px;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--canvas);
+  color: var(--active);
+  overflow: hidden;
+  height: 100vh;
+}
+.titlebar {
+  -webkit-app-region: drag;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; background: var(--canvas); border-bottom: 1px solid #1e293b;
+}
+.titlebar-title { font-size: 13px; font-weight: 600; color: var(--secondary); }
+.titlebar-btns { -webkit-app-region: no-drag; display: flex; gap: 6px; }
+.titlebar-btn {
+  width: 28px; height: 28px; border: none; border-radius: 6px;
+  background: transparent; color: var(--secondary); font-size: 16px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.titlebar-btn:hover { background: var(--card); }
+.titlebar-btn.close:hover { background: var(--alert); color: white; }
+
+.app { height: calc(100vh - 45px); overflow-y: auto; padding: 16px; }
+.app::-webkit-scrollbar { width: 4px; }
+.app::-webkit-scrollbar-thumb { background: var(--card); border-radius: 2px; }
+
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.header h1 { font-size: 20px; color: var(--active); }
+.header span { font-size: 11px; color: var(--secondary); opacity: 0.5; }
+
+.timer-section { display: flex; flex-direction: column; align-items: center; padding: 20px 0; }
+.ring-container { position: relative; width: 240px; height: 240px; margin-bottom: 16px; }
+.ring-svg { transform: rotate(-90deg); }
+.ring-bg { fill: none; stroke: var(--card); stroke-width: 6; }
+.ring-progress { fill: none; stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 0.3s, stroke 0.3s; }
+.timer-center {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; text-align: center;
+}
+.timer-label { font-size: 12px; color: var(--secondary); letter-spacing: 2px; }
+.timer-time { font-size: 48px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 8px 0; }
+.timer-status { font-size: 11px; color: var(--accent); letter-spacing: 4px; }
+
+.waiting-time { font-size: 48px; font-weight: 700; color: var(--active); }
+.waiting-label { font-size: 12px; color: var(--secondary); letter-spacing: 2px; margin-bottom: 8px; }
+.waiting-start { font-size: 12px; color: var(--accent); }
+
+.suggestion { background: var(--card); border: 1px solid var(--accent); border-radius: 12px; padding: 12px; margin: 8px 16px; text-align: center; font-size: 13px; color: var(--secondary); }
+
+.controls { display: flex; justify-content: center; gap: 10px; margin: 20px 0; }
+.btn {
+  padding: 12px 36px; border-radius: 100px; border: 1px solid var(--card);
+  background: var(--card); color: var(--active); font-size: 14px; font-weight: 700;
+  letter-spacing: 2px; cursor: pointer; transition: all 0.15s;
+}
+.btn:active { transform: scale(0.96); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--canvas); }
+.btn-danger { background: transparent; border-color: var(--alert); color: var(--alert); }
+.btn-sm { padding: 8px 20px; font-size: 12px; }
+
+.info { text-align: center; font-size: 12px; color: var(--secondary); opacity: 0.7; margin-bottom: 16px; }
+
+/* Console */
+.console {
+  background: var(--card); border-radius: var(--radius); border: 1px solid var(--card);
+  margin-bottom: 12px; overflow: hidden;
+}
+.console-header { display: flex; align-items: center; padding: 10px 14px 6px; }
+.console-header h3 { font-size: 12px; color: var(--active); margin-right: 6px; }
+.console-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 4px; }
+.console-model { font-size: 10px; color: var(--accent); letter-spacing: 1px; }
+.console-error { background: rgba(239,68,68,0.1); margin: 0 14px 8px; padding: 8px; border-radius: 6px; color: var(--alert); font-size: 12px; }
+.console-input-row { display: flex; gap: 8px; padding: 0 14px 10px; }
+.console-input {
+  flex: 1; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--card);
+  background: var(--canvas); color: var(--active); font-size: 14px; outline: none;
+}
+.console-input::placeholder { color: var(--secondary); opacity: 0.6; }
+.console-send {
+  width: 40px; height: 40px; border-radius: 50%; border: none;
+  background: var(--accent); color: var(--canvas); font-size: 18px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.console-send:disabled { background: var(--card); color: var(--secondary); cursor: not-allowed; }
+.spinner { width: 18px; height: 18px; border: 2px solid var(--canvas); border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Tabs */
+.tabs { display: flex; border-bottom: 1px solid var(--card); margin-bottom: 12px; }
+.tab {
+  flex: 1; padding: 10px; text-align: center; cursor: pointer;
+  color: var(--secondary); font-size: 13px; font-weight: 600; letter-spacing: 1px;
+  border-bottom: 2px solid transparent; transition: all 0.15s;
+}
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Schedule timeline */
+.schedule-empty { text-align: center; padding: 40px 20px; color: var(--secondary); }
+.schedule-empty h3 { font-size: 16px; margin-bottom: 8px; }
+.schedule-empty p { font-size: 13px; opacity: 0.7; }
+.phase-card {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px; margin-bottom: 8px; border-radius: 8px;
+  border-left: 3px solid var(--card); background: var(--card);
+}
+.phase-card.active { border-left-color: var(--accent); }
+.phase-card.done { border-left-color: var(--success); opacity: 0.7; }
+.phase-label { font-size: 14px; font-weight: 600; }
+.phase-badge { font-size: 10px; font-weight: 700; color: var(--canvas); padding: 2px 8px; border-radius: 4px; letter-spacing: 1px; }
+.phase-badge.active { background: var(--accent); }
+.phase-badge.done { background: var(--success); }
+.phase-badge.pending { background: var(--card); color: var(--secondary); border: 1px solid var(--card); }
+.phase-time { font-size: 12px; color: var(--secondary); }
+
+/* Break card */
+.break-card {
+  display: flex; align-items: center; gap: 12px; padding: 12px; margin-bottom: 8px;
+  border-radius: 8px; border-left: 3px solid var(--card); background: var(--card); opacity: 0.85;
+}
+.break-card.active { border-left-color: var(--warning); opacity: 1; }
+.break-icon { width: 36px; height: 36px; border-radius: 50%; background: var(--card); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.break-label { font-size: 14px; font-weight: 600; color: var(--secondary); }
+.break-info { font-size: 12px; color: var(--secondary); }
+
+/* Stats */
+.stats-row { display: flex; gap: 8px; margin-bottom: 16px; }
+.stat-card {
+  flex: 1; background: var(--card); border-radius: 8px; padding: 12px;
+  text-align: center; border: 1px solid var(--card);
+}
+.stat-num { font-size: 24px; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+.stat-label { font-size: 11px; color: var(--secondary); letter-spacing: 1px; }
+.section-title { font-size: 11px; color: var(--secondary); letter-spacing: 1px; margin-bottom: 8px; }
+
+/* Alert overlay */
+.alert-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+}
+.alert-card {
+  background: var(--card); border-radius: 20px; padding: 24px; width: 85%;
+  text-align: center; border: 1px solid var(--alert);
+}
+.alert-icon { width: 48px; height: 48px; border-radius: 50%; background: rgba(239,68,68,0.15); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; }
+.alert-dot { width: 24px; height: 24px; border-radius: 50%; background: var(--alert); }
+.alert-title { font-size: 20px; color: var(--alert); letter-spacing: 2px; margin-bottom: 8px; }
+.alert-text { font-size: 13px; color: var(--secondary); margin-bottom: 20px; line-height: 1.5; }
+.alert-btn { width: 80%; margin: 0 auto 8px; }
+.alert-btn-secondary { width: 80%; margin: 0 auto; background: transparent; border-color: var(--card); color: var(--secondary); }
+
+/* Complete overlay */
+.complete-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+}
+.complete-card { background: var(--card); border-radius: 20px; padding: 24px; width: 85%; text-align: center; border: 1px solid var(--accent); }
+.complete-icon { font-size: 48px; margin-bottom: 12px; }
+.complete-title { font-size: 20px; color: var(--accent); margin-bottom: 16px; letter-spacing: 2px; }
+.complete-stats { display: flex; justify-content: center; gap: 24px; margin-bottom: 16px; }
+.complete-stat { text-align: center; }
+.complete-stat-num { font-size: 24px; font-weight: 700; color: var(--active); }
+.complete-stat-label { font-size: 11px; color: var(--secondary); letter-spacing: 1px; }
+.complete-divider { width: 1px; background: var(--card); }
+
+/* Chart */
+.chart-card { background: var(--card); border-radius: var(--radius); padding: 14px; border: 1px solid var(--card); margin-bottom: 12px; }
+.chart-title { font-size: 11px; color: var(--secondary); letter-spacing: 1px; margin-bottom: 12px; }
+.bars { display: flex; justify-content: space-around; align-items: flex-end; height: 140px; margin-bottom: 8px; }
+.bar-col { display: flex; flex-direction: column; align-items: center; flex: 1; }
+.bar-value { font-size: 10px; color: var(--secondary); margin-bottom: 4px; }
+.bar {
+  width: 24px; border-radius: 4px; min-height: 0;
+  background: var(--card); transition: height 0.3s;
+}
+.bar.today { background: var(--accent); }
+.bar-label { font-size: 10px; color: var(--secondary); margin-top: 4px; }
+.bar-label.today { color: var(--accent); }
+.avg-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--secondary); opacity: 0.7; }
+
+/* Settings row */
+.setting-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 14px; margin-bottom: 6px; border-radius: 8px;
+  background: var(--card); border: 1px solid var(--card);
+}
+.setting-label { font-size: 14px; color: var(--active); }
+.setting-control { display: flex; align-items: center; gap: 8px; }
+.setting-value { font-size: 14px; font-weight: 700; color: var(--accent); min-width: 40px; text-align: center; }
+.setting-btn {
+  width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--card);
+  background: var(--canvas); color: var(--accent); font-size: 18px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.toggle {
+  width: 44px; height: 24px; border-radius: 12px; border: 1px solid var(--card);
+  background: var(--canvas); cursor: pointer; padding: 2px; transition: all 0.2s;
+}
+.toggle.on { background: var(--accent); border-color: var(--accent); }
+.toggle-knob { width: 18px; height: 18px; border-radius: 50%; background: var(--secondary); transition: all 0.2s; }
+.toggle.on .toggle-knob { background: var(--canvas); margin-left: 20px; }
+.lang-row { display: flex; gap: 6px; }
+.lang-btn { padding: 4px 14px; border-radius: 6px; border: 1px solid var(--card); background: var(--canvas); color: var(--secondary); font-size: 12px; font-weight: 600; cursor: pointer; }
+.lang-btn.active { border-color: var(--accent); background: rgba(45,212,191,0.12); color: var(--accent); }
+.minimize-btn { width: 28px; height: 28px; border: none; border-radius: 6px; background: var(--card); color: var(--secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; margin: 0 auto 12px; }
+.minimize-btn:hover { background: var(--card); opacity: 0.8; }
+</style>
+</head>
+<body>
+
+<div class="titlebar">
+  <span class="titlebar-title">Phase Study</span>
+  <div class="titlebar-btns">
+    <button class="titlebar-btn" onclick="electronAPI.minimizeWindow()">─</button>
+    <button class="titlebar-btn close" onclick="electronAPI.closeWindow()">✕</button>
+  </div>
+</div>
+
+<div class="app" id="app">
+  <div class="header">
+    <h1 id="appTitle">Phase Study</h1>
+    <span id="appVersion">v1.0</span>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <div class="tab active" data-tab="home">Timer</div>
+    <div class="tab" data-tab="console">Console</div>
+    <div class="tab" data-tab="schedule">Schedule</div>
+    <div class="tab" data-tab="settings">Settings</div>
+  </div>
+
+  <!-- Timer Tab -->
+  <div class="tab-content active" id="tab-home">
+    <div class="timer-section">
+      <div class="ring-container" id="ringContainer">
+        <svg class="ring-svg" viewBox="0 0 120 120" width="240" height="240">
+          <circle class="ring-bg" cx="60" cy="60" r="52"/>
+          <circle class="ring-progress" id="ringProgress" cx="60" cy="60" r="52"
+            stroke-dasharray="326.73" stroke-dashoffset="0"/>
+        </svg>
+        <div class="timer-center" id="timerCenter">
+          <div id="waitingDisplay" style="display:none">
+            <div class="waiting-label">STARTS IN</div>
+            <div class="waiting-time" id="waitingTime">00:00</div>
+            <div class="waiting-start" id="waitingStartAt"></div>
+          </div>
+          <div id="timerDisplay">
+            <div class="timer-label" id="intervalLabel">READY</div>
+            <div class="timer-time" id="timerTime" style="color:var(--active)">00:00</div>
+            <div class="timer-status" id="timerStatus">FOCUS</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="suggestionArea" style="display:none">
+      <div class="suggestion" id="suggestionText"></div>
+    </div>
+
+    <div class="controls" id="controls">
+      <div id="waitingBtns" style="display:none;display:flex;gap:10px">
+        <button class="btn btn-primary" onclick="skipWait()">SKIP WAIT</button>
+        <button class="btn btn-danger" onclick="clearSchedule()">CANCEL</button>
+      </div>
+      <div id="runningBtns" style="display:none">
+        <button class="btn" id="pauseBtn" onclick="pauseTimer()">PAUSE</button>
+      </div>
+      <div id="pausedBtns" style="display:none">
+        <button class="btn btn-primary" onclick="resumeTimer()">RESUME</button>
+      </div>
+      <div id="idleBtns" style="display:none">
+        <button class="btn btn-primary" onclick="startTimerDirect()">START</button>
+      </div>
+    </div>
+
+    <div class="info" id="infoText">Use Console to set a schedule</div>
+
+    <button class="minimize-btn" onclick="electronAPI.minimizeWindow()">─ Minimize to tray</button>
+  </div>
+
+  <!-- Console Tab -->
+  <div class="tab-content" id="tab-console">
+    <div class="console">
+      <div class="console-header">
+        <h3>AI Console</h3>
+        <div class="console-dot"></div>
+        <span class="console-model">Gemini Flash-Lite</span>
+      </div>
+      <div id="errorArea" style="display:none"><div class="console-error" id="errorText"></div></div>
+      <div class="console-input-row">
+        <input class="console-input" id="consoleInput" placeholder="Type a command or question..." autofocus>
+        <button class="console-send" id="sendBtn" onclick="sendCommand()">→</button>
+      </div>
+    </div>
+    <div class="section-title">Schedule Timeline</div>
+    <div id="timelineArea"></div>
+  </div>
+
+  <!-- Schedule Tab -->
+  <div class="tab-content" id="tab-schedule">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="section-title" style="margin-bottom:0">Schedule</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent)" onclick="showStatsTab()">📊 Stats</button>
+        <button class="btn btn-sm btn-danger" id="clearBtn" style="display:none" onclick="handleClear()">Clear</button>
+      </div>
+    </div>
+    <div id="statsCards" style="display:none">
+      <div class="stats-row" id="summaryCards"></div>
+      <div class="chart-card" id="chartCard">
+        <div class="chart-title">Weekly Hours</div>
+        <div class="bars" id="barChart"></div>
+        <div class="avg-row" id="avgRow"></div>
+      </div>
+      <div class="chart-card" id="historyCard" style="display:none">
+        <div class="chart-title">Recent Sessions</div>
+        <div id="historyList"></div>
+      </div>
+    </div>
+    <div id="statsEmpty" style="display:block">
+      <div class="schedule-empty"><h3>No data yet</h3></div>
+    </div>
+    <div class="section-title" style="margin-top:12px">Timeline</div>
+    <div id="scheduleTimeline"></div>
+  </div>
+
+  <!-- Settings Tab -->
+  <div class="tab-content" id="tab-settings">
+    <div class="section-title">Language</div>
+    <div class="setting-row">
+      <span class="setting-label">Language</span>
+      <div class="lang-row">
+        <button class="lang-btn active" id="langEn" onclick="setLang('en')">English</button>
+        <button class="lang-btn" id="langAr" onclick="setLang('ar')">العربية</button>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:12px">Study Intervals</div>
+    <div id="settingsList"></div>
+
+    <div class="section-title" style="margin-top:12px">Sound</div>
+    <div id="soundSettings"></div>
+
+    <div class="section-title" style="margin-top:12px">Auto-continue</div>
+    <div id="autoContinueSettings"></div>
+
+    <div style="text-align:center;margin-top:20px;opacity:0.5">
+      <div style="font-size:12px;color:var(--secondary)">Phase Study v1.0</div>
+      <div style="font-size:10px;color:var(--secondary);margin-top:4px">AI-Powered Study Timer</div>
+    </div>
+  </div>
+</div>
+
+<!-- Alert overlay -->
+<div class="alert-overlay" id="alertOverlay" style="display:none">
+  <div class="alert-card">
+    <div class="alert-icon"><div class="alert-dot"></div></div>
+    <div class="alert-title" id="alertTitle">PHASE COMPLETE</div>
+    <div class="alert-text" id="alertText">Your study phase has finished.</div>
+    <button class="btn alert-btn btn-primary" id="alertDismissBtn" onclick="dismissAlert()">DISMISS</button>
+    <button class="btn alert-btn-secondary btn-sm" onclick="dismissAlert()">FINISH EARLY</button>
+  </div>
+</div>
+
+<!-- Session complete overlay -->
+<div class="complete-overlay" id="completeOverlay" style="display:none">
+  <div class="complete-card">
+    <div class="complete-icon">🎉</div>
+    <div class="complete-title">SESSION COMPLETE</div>
+    <div class="complete-stats">
+      <div class="complete-stat"><div class="complete-stat-num" id="completePhases">0</div><div class="complete-stat-label">PHASES</div></div>
+      <div class="complete-divider"></div>
+      <div class="complete-stat"><div class="complete-stat-num" id="completeTime">0h 0m</div><div class="complete-stat-label">STUDIED</div></div>
+    </div>
+    <button class="btn btn-primary" style="width:80%" onclick="dismissComplete()">DISMISS</button>
+  </div>
+</div>
+
+<script>
+// ==================== TRANSLATIONS ====================
+const TRANS = {
+  en: {
+    study: 'STUDY', shortBreak: 'SHORT BREAK', bigBreak: 'BIG BREAK',
+    startsIn: 'STARTS IN', ready: 'READY', pause: 'PAUSE', resume: 'RESUME',
+    skipWait: 'SKIP WAIT', cancel: 'CANCEL', start: 'START', focus: 'FOCUS',
+    paused: 'PAUSED', dismiss: 'DISMISS', finishEarly: 'FINISH EARLY',
+    phaseComplete: 'PHASE COMPLETE', breakEnded: 'BREAK ENDED',
+    phaseFinished: 'Your study phase has finished. Time for a Big Break!',
+    breakFinished: 'Your Big Break is over. Ready for the next phase?',
+    aiConsole: 'AI Console', gemini: 'Gemini Flash-Lite',
+    consoleHint: 'Type a command or question...',
+    noSchedule: 'No schedule yet', noScheduleHint: 'Use the AI Console to set your study schedule',
+    sessionComplete: 'SESSION COMPLETE', phases: 'Phases', studied: 'Studied',
+    phaseStudy: 'Phase Study', scheduleSet: 'Schedule set — auto-starts at',
+    startNow: 'Use Console to set a schedule', interval: 'Interval',
+    weeklyHours: 'Weekly Hours', today: 'Today', thisWeek: 'This Week',
+    allTime: 'All Time', dailyAvg: 'Daily avg', phasesCompleted: 'phases completed',
+    recentSessions: 'Recent Sessions', phase: 'Phase', studiedLabel: 'Studied',
+    settings: 'Settings', language: 'Language', english: 'English', arabic: 'العربية',
+    studyDuration: 'Study duration (min)', shortBreakDuration: 'Short break (min)',
+    phaseDuration: 'Phase duration (min)', bigBreakDuration: 'Big break (min)',
+    intervalsPerPhase: 'Intervals per phase', soundEnabled: 'Sound on interval change',
+    tierBEnabled: 'Tier B alert (phase ends)', autoContinue: 'Auto-continue after breaks',
+    minutes: 'min', noData: 'No data yet', phasesDone: 'PHASES', studiedUpper: 'STUDIED',
+    active: 'ACTIVE', done: 'DONE', pending: 'PENDING', minRest: 'min rest',
+    clear: 'Clear', stats: 'Stats',
+  },
+  ar: {
+    study: 'مذاكرة', shortBreak: 'استراحة قصيرة', bigBreak: 'استراحة طويلة',
+    startsIn: 'يبدأ بعد', ready: 'جاهز', pause: 'إيقاف مؤقت', resume: 'استئناف',
+    skipWait: 'تخطي الانتظار', cancel: 'إلغاء', start: 'بدء', focus: 'تَرَكُّز',
+    paused: 'متوقف', dismiss: 'إغلاق', finishEarly: 'إنهاء مبكر',
+    phaseComplete: 'اكتملت الحصة', breakEnded: 'انتهت الاستراحة',
+    phaseFinished: 'انتهت حصة المذاكرة. حان وقت الاستراحة الطويلة!',
+    breakFinished: 'انتهت استراحتك. هل أنت مستعد للحصة القادمة؟',
+    aiConsole: 'الكونسول الذكي', gemini: 'Gemini Flash-Lite',
+    consoleHint: 'اكتب أمرًا أو سؤالًا...',
+    noSchedule: 'لا يوجد جدول بعد', noScheduleHint: 'استخدم الكونسول الذكي لضبط جدول المذاكرة',
+    sessionComplete: '🎉 اكتملت الجلسة', phases: 'الحصص', studied: 'تمت المذاكرة',
+    phaseStudy: 'Phase Study', scheduleSet: 'تم ضبط الجدول — سيبدأ تلقائيًا في',
+    startNow: 'استخدم الكونسول لضبط جدول', interval: 'فترة',
+    weeklyHours: 'ساعات الأسبوع', today: 'اليوم', thisWeek: 'هذا الأسبوع',
+    allTime: 'الإجمالي', dailyAvg: 'المعدل اليومي', phasesCompleted: 'حصص مكتملة',
+    recentSessions: 'الجلسات الأخيرة', phase: 'حصة', studiedLabel: 'مذاكرة',
+    settings: 'الإعدادات', language: 'اللغة', english: 'English', arabic: 'العربية',
+    studyDuration: 'مدة المذاكرة (دقيقة)', shortBreakDuration: 'الاستراحة القصيرة (دقيقة)',
+    phaseDuration: 'مدة الحصة (دقيقة)', bigBreakDuration: 'الاستراحة الطويلة (دقيقة)',
+    intervalsPerPhase: 'فترات لكل حصة', soundEnabled: 'صوت عند تغيير الفترة',
+    tierBEnabled: 'تنبيه عند انتهاء الحصة', autoContinue: 'استمرار تلقائي بعد الاستراحات',
+    minutes: 'دقيقة', noData: 'لا توجد بيانات بعد', phasesDone: 'حصص', studiedUpper: 'مذاكرة',
+    active: 'نشط', done: 'تم', pending: 'قيد الانتظار', minRest: 'دقيقة راحة',
+    clear: 'مسح', stats: 'إحصائيات',
+  }
+};
+
+let lang = localStorage.getItem('phase_study_lang') || 'en';
+function t(key) { return (TRANS[lang] || TRANS.en)[key] || key; }
+
+function setLang(l) {
+  lang = l;
+  localStorage.setItem('phase_study_lang', l);
+  document.getElementById('langEn').className = 'lang-btn' + (l === 'en' ? ' active' : '');
+  document.getElementById('langAr').className = 'lang-btn' + (l === 'ar' ? ' active' : '');
+  updateUIStrings();
+  renderSettings();
+}
+
+function updateUIStrings() {
+  document.getElementById('appTitle').textContent = t('phaseStudy');
+  // Tabs
+  document.querySelectorAll('.tab')[0].textContent = t('startNow').includes('Console') ? 'Timer' : 'المؤقت';
+  document.querySelectorAll('.tab')[1].textContent = t('aiConsole');
+  document.querySelectorAll('.tab')[2].textContent = t('settings').includes('Settings') ? 'Schedule' : 'الجدول';
+  document.querySelectorAll('.tab')[3].textContent = t('settings');
+  updateTimerDisplay();
+}
+
+// ==================== STATE ====================
+const STATE = {
+  settings: {
+    studyDuration: 25, shortBreakDuration: 5, phaseDuration: 50,
+    bigBreakDuration: 30, intervalsPerPhase: 4,
+    soundEnabled: true, tierBEnabled: true, autoContinue: false,
+  },
+  schedule: [],
+  intervals: [],
+  currentPhaseIndex: 0,
+  currentIntervalIndex: 0,
+  timeRemaining: 0,
+  bigBreakTimeRemaining: 0,
+  isRunning: false,
+  activeTimerType: null, // null | 'phase_intervals' | 'big_break' | 'waiting'
+  isWaitingToStart: false,
+  waitingUntil: null,
+  tierBAlert: false,
+  tierBType: null, // 'phase_end' | 'big_break_end' | null
+  autoContinueCountdown: null,
+  consoleInput: '',
+  isParsing: false,
+  isConsoleLocked: false,
+  error: null,
+  suggestion: null,
+  totalStudiedSeconds: 0,
+  dailyHistory: {}, // "YYYY-MM-DD" -> seconds
+  sessionHistory: [],
+  isSessionComplete: false,
+  sessionCompleteStats: null,
+  version: 0,
+};
+
+let timerInterval = null;
+let autoContinueInterval = null;
+
+const CIRCUMFERENCE = 2 * Math.PI * 52;
+
+function todayKey() { return new Date().toISOString().slice(0, 10); }
+
+function addDaily(secs) {
+  const key = todayKey();
+  STATE.dailyHistory = { ...STATE.dailyHistory, [key]: (STATE.dailyHistory[key] || 0) + secs };
+}
+
+// ==================== SCHEDULE UTILS ====================
+function generateIntervals(sett) {
+  sett = sett || STATE.settings;
+  const intervals = [];
+  for (let i = 0; i < sett.intervalsPerPhase; i++) {
+    intervals.push({ type: 'study', duration: sett.studyDuration, status: i === 0 ? 'active' : 'pending' });
+    if (i < sett.intervalsPerPhase - 1) {
+      intervals.push({ type: 'short_break', duration: sett.shortBreakDuration, status: 'pending' });
+    }
+  }
+  return intervals;
+}
+
+function generateScheduleBlocks(startTime, endTime, sett) {
+  sett = sett || STATE.settings;
+  const blocks = [];
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  const totalMinutes = (end - start) / 60000;
+  const phaseDuration = sett.phaseDuration;
+  const bigBreakDuration = sett.bigBreakDuration;
+  const intervalsPerPhase = sett.intervalsPerPhase;
+
+  let phaseIndex = 0;
+  let cursor = new Date(start);
+
+  while (cursor < end) {
+    const remaining = (end - cursor) / 60000;
+    const duration = Math.min(phaseDuration, remaining);
+
+    const phaseStart = new Date(cursor);
+    const phaseEnd = new Date(cursor.getTime() + duration * 60000);
+    blocks.push({
+      id: `phase-${phaseIndex}`, label: `${t('phase')} ${phaseIndex + 1}`,
+      startTime: phaseStart.toISOString(), endTime: phaseEnd.toISOString(),
+      duration: Math.round(duration), type: 'phase', status: 'pending', phaseIndex,
+    });
+
+    cursor = phaseEnd;
+    phaseIndex++;
+
+    // Add big break between phases (never after last)
+    if (cursor < end) {
+      const bbEnd = new Date(cursor.getTime() + bigBreakDuration * 60000);
+      if (bbEnd <= end) {
+        blocks.push({
+          id: `break-${phaseIndex - 1}`, label: `${t('bigBreak')}`,
+          startTime: cursor.toISOString(), endTime: bbEnd.toISOString(),
+          duration: bigBreakDuration, type: 'big_break', status: 'pending', phaseIndex: phaseIndex - 1,
+        });
+        cursor = bbEnd;
+      }
+    }
+  }
+
+  return blocks;
+}
+
+function normalizeSchedule(phases) {
+  return phases.map((p, i) => ({ ...p, phaseIndex: i }));
+}
+
+// ==================== GEMINI API ====================
+const GEMINI_API_KEY = localStorage.getItem('gemini_api_key') || '';
+const GEMINI_MODEL = 'gemini-flash-lite-latest';
+
+async function callGemini(prompt) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 1024 },
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Gemini API error: ${res.status} ${err}`);
+  }
+  const data = await res.json();
+  return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+function extractJSON(text) {
+  const m = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (m) return m[1].trim();
+  const b = text.match(/\{[\s\S]*\}/);
+  if (b) return b[0].trim();
+  return text.trim();
+}
+
+async function parseSchedule(input) {
+  const hoursToday = Math.round(STATE.totalStudiedSeconds / 3600 * 10) / 10;
+  const now = new Date().toISOString();
+  const sysPrompt = `You are a study assistant. Extract the START time and END time from the user's schedule. Give a short suggestion about gym/nap/break based on study hours today. Return ONLY valid JSON: {"startTime": "HH:MM AM/PM", "endTime": "HH:MM AM/PM", "suggestion": "..."}. Current time: ${now}. Hours studied today: ${hoursToday}h.`;
+  const raw = await callGemini(`${sysPrompt}\n\nUser: "${input}"`);
+  const json = JSON.parse(extractJSON(raw));
+
+  // Convert to ISO times
+  const start = new Date(json.startTime);
+  const end = new Date(json.endTime);
+  if (isNaN(start) || isNaN(end)) throw new Error('Could not parse times from schedule');
+
+  const nowMs = new Date().getTime();
+  // If start is in the past but end is in the future, shift start to now
+  if (start.getTime() < nowMs && end.getTime() > nowMs) {
+    start.setTime(nowMs);
+  }
+
+  const blocks = generateScheduleBlocks(start.toISOString(), end.toISOString());
+  return { phases: blocks, suggestion: json.suggestion || null };
+}
+
+async function processAdjustment(input) {
+  // Extend/delay handling via Gemini
+  const sysPrompt = `The user wants to extend or delay their study schedule. Understand the intent and return JSON: {"action": "extend"|"delay", "phaseIndex": 0, "minutes": 15}. Current schedule phases: ${JSON.stringify(STATE.schedule.map(p => ({label: p.label, start: p.startTime, end: p.endTime})))}.`;
+  const raw = await callGemini(`${sysPrompt}\n\nUser: "${input}"`);
+  const json = JSON.parse(extractJSON(raw));
+  // Simple slide implementation
+  const updated = STATE.schedule.map(b => {
+    if (b.phaseIndex >= json.phaseIndex) {
+      const added = json.action === 'extend' ? json.minutes : -json.minutes;
+      const s = new Date(b.startTime); s.setMinutes(s.getMinutes() + added);
+      const e = new Date(b.endTime); e.setMinutes(e.getMinutes() + added);
+      return { ...b, startTime: s.toISOString(), endTime: e.toISOString() };
+    }
+    return b;
+  });
+  return { phases: updated };
+}
+
+// ==================== TIMER ====================
+function renderTimerDisplay() {
+  const isWaiting = STATE.isWaitingToStart && STATE.activeTimerType === 'waiting';
+  const isBigBreak = STATE.activeTimerType === 'big_break';
+  const isPhaseIntervals = STATE.activeTimerType === 'phase_intervals';
+  const ci = STATE.intervals[STATE.currentIntervalIndex];
+  const remaining = isBigBreak ? STATE.bigBreakTimeRemaining : STATE.timeRemaining;
+  const totalSec = isBigBreak
+    ? STATE.settings.bigBreakDuration * 60
+    : ci ? ci.duration * 60 : 1;
+  const progress = totalSec > 0 ? 1 - remaining / totalSec : 0;
+
+  // Ring
+  const offset = CIRCUMFERENCE * (1 - progress);
+  const ring = document.getElementById('ringProgress');
+  ring.setAttribute('stroke-dashoffset', offset);
+  if (isWaiting) ring.setAttribute('stroke', '#94a3b8');
+  else if (isBigBreak) ring.setAttribute('stroke', '#eab308');
+  else ring.setAttribute('stroke', remaining <= 60 ? '#ef4444' : '#2dd4bf');
+
+  // Center display
+  const waitingEl = document.getElementById('waitingDisplay');
+  const timerEl = document.getElementById('timerDisplay');
+
+  if (isWaiting) {
+    waitingEl.style.display = 'block';
+    timerEl.style.display = 'none';
+    document.getElementById('waitingTime').textContent = formatTime(STATE.timeRemaining);
+    document.getElementById('waitingStartAt').textContent = STATE.waitingUntil
+      ? `${t('scheduleSet')} ${formatTimeLabel(STATE.waitingUntil)}` : '';
+  } else {
+    waitingEl.style.display = 'none';
+    timerEl.style.display = 'block';
+    const label = isBigBreak
+      ? t('bigBreak')
+      : ci ? (ci.type === 'study' ? t('study') : t('shortBreak')) : t('ready');
+    document.getElementById('intervalLabel').textContent = label;
+    document.getElementById('timerTime').textContent = formatTime(remaining);
+    document.getElementById('timerTime').style.color = remaining <= 60 ? '#ef4444' : '#f8fafc';
+    document.getElementById('timerStatus').textContent = STATE.isRunning ? t('focus') : t('paused');
+  }
+
+  // Controls
+  document.getElementById('waitingBtns').style.display = isWaiting ? 'flex' : 'none';
+  document.getElementById('runningBtns').style.display = (!isWaiting && STATE.isRunning) ? 'block' : 'none';
+  document.getElementById('pausedBtns').style.display = (!isWaiting && !STATE.isRunning && STATE.activeTimerType) ? 'block' : 'none';
+  document.getElementById('idleBtns').style.display = (!STATE.activeTimerType && !isWaiting && !STATE.isRunning) ? 'block' : 'none';
+
+  // Suggestion
+  const sugEl = document.getElementById('suggestionArea');
+  if (STATE.suggestion && !isWaiting) {
+    sugEl.style.display = 'block';
+    document.getElementById('suggestionText').textContent = STATE.suggestion;
+  } else {
+    sugEl.style.display = 'none';
+  }
+
+  // Info
+  const infoEl = document.getElementById('infoText');
+  if (isWaiting) {
+    infoEl.textContent = `${t('scheduleSet')} ${STATE.waitingUntil ? formatTimeLabel(STATE.waitingUntil) : ''}`;
+  } else if (isPhaseIntervals) {
+    infoEl.textContent = `${t('interval')} ${STATE.currentIntervalIndex + 1} / ${STATE.intervals.length}`;
+  } else if (isBigBreak) {
+    infoEl.textContent = `${t('bigBreak')} — ${t('phase')} ${STATE.currentPhaseIndex + 1} ${t('done').toLowerCase()}`;
+  } else {
+    infoEl.textContent = STATE.schedule.length > 0 ? '' : t('startNow');
+  }
+
+  // Tray
+  if (STATE.isRunning || isWaiting) {
+    electronAPI.updateTray(`${formatTime(remaining)} ${isBigBreak ? t('bigBreak') : isWaiting ? t('startsIn') : t('study')}`);
+  } else {
+    electronAPI.updateTray('');
+  }
+}
+
+let tickId = null;
+function startTick() {
+  stopTick();
+  tickId = setInterval(() => {
+    if (!STATE.isRunning) return;
+    const isBigBreak = STATE.activeTimerType === 'big_break';
+    const remaining = isBigBreak ? STATE.bigBreakTimeRemaining : STATE.timeRemaining;
+    if (remaining <= 0) {
+      handleTimeComplete();
+      return;
+    }
+    if (isBigBreak) STATE.bigBreakTimeRemaining--;
+    else STATE.timeRemaining--;
+    renderTimerDisplay();
+  }, 1000);
+}
+
+function stopTick() {
+  if (tickId) { clearInterval(tickId); tickId = null; }
+}
+
+function handleTimeComplete() {
+  stopTick();
+  STATE.isRunning = false;
+  electronAPI.setPowerSave(false);
+
+  if (STATE.activeTimerType === 'big_break') {
+    STATE.tierBAlert = true;
+    STATE.tierBType = 'big_break_end';
+    STATE.autoContinueCountdown = STATE.settings.autoContinue ? 5 : null;
+    STATE.bigBreakTimeRemaining = 0;
+    renderTimerDisplay();
+    showAlert();
+    electronAPI.showNotification(t('breakEnded'), t('breakFinished'));
+    return;
+  }
+
+  const intervals = [...STATE.intervals];
+  const ci = intervals[STATE.currentIntervalIndex];
+  if (!ci) return;
+  const isStudy = ci.type === 'study';
+  const isLast = STATE.currentIntervalIndex >= intervals.length - 1;
+  intervals[STATE.currentIntervalIndex] = { ...ci, status: 'completed' };
+
+  // Track study seconds
+  const added = isStudy ? ci.duration * 60 : 0;
+  STATE.totalStudiedSeconds += added;
+  addDaily(added);
+
+  if (isLast) {
+    STATE.intervals = intervals;
+    STATE.timeRemaining = 0;
+    STATE.tierBAlert = true;
+    STATE.tierBType = 'phase_end';
+    STATE.autoContinueCountdown = STATE.settings.autoContinue ? 5 : null;
+    STATE.sessionHistory.push({ phaseIndex: STATE.currentPhaseIndex, completedAt: new Date().toISOString() });
+    renderTimerDisplay();
+    showAlert();
+    electronAPI.showNotification(t('phaseComplete'), t('phaseFinished'));
+    return;
+  }
+
+  // Next interval
+  const nextIdx = STATE.currentIntervalIndex + 1;
+  const next = intervals[nextIdx];
+  next.status = 'active';
+  STATE.intervals = intervals;
+  STATE.currentIntervalIndex = nextIdx;
+  STATE.timeRemaining = next.duration * 60;
+  STATE.version++;
+  renderTimerDisplay();
+  startTick();
+  electronAPI.setPowerSave(true);
+}
+
+// ==================== ALERT SYSTEM ====================
+function showAlert() {
+  const overlay = document.getElementById('alertOverlay');
+  const isPhaseEnd = STATE.tierBType === 'phase_end';
+  document.getElementById('alertTitle').textContent = isPhaseEnd ? t('phaseComplete') : t('breakEnded');
+  document.getElementById('alertText').textContent = isPhaseEnd ? t('phaseFinished') : t('breakFinished');
+  overlay.style.display = 'flex';
+
+  if (STATE.autoContinueCountdown !== null) {
+    startAutoContinueCountdown();
+  }
+}
+
+function startAutoContinueCountdown() {
+  if (autoContinueInterval) clearInterval(autoContinueInterval);
+  const btn = document.getElementById('alertDismissBtn');
+  btn.textContent = `${t('dismiss')} (${STATE.autoContinueCountdown})`;
+  autoContinueInterval = setInterval(() => {
+    if (STATE.autoContinueCountdown === null) {
+      clearInterval(autoContinueInterval);
+      autoContinueInterval = null;
+      return;
+    }
+    STATE.autoContinueCountdown--;
+    if (STATE.autoContinueCountdown <= 0) {
+      clearInterval(autoContinueInterval);
+      autoContinueInterval = null;
+      dismissAlert();
+    } else {
+      btn.textContent = `${t('dismiss')} (${STATE.autoContinueCountdown})`;
+    }
+  }, 1000);
+}
+
+function dismissAlert() {
+  if (autoContinueInterval) { clearInterval(autoContinueInterval); autoContinueInterval = null; }
+  document.getElementById('alertOverlay').style.display = 'none';
+  STATE.tierBAlert = false;
+  STATE.tierBType = null;
+  STATE.autoContinueCountdown = null;
+
+  // Handle phase end -> big break or next phase
+  if (STATE.tierBType_beforeDismiss === 'phase_end' || document.getElementById('alertTitle').textContent === t('phaseComplete')) {
+    const hasBigBreak = STATE.schedule.some(b => b.type === 'big_break' && b.phaseIndex === STATE.currentPhaseIndex);
+    if (hasBigBreak) {
+      STATE.activeTimerType = 'big_break';
+      STATE.bigBreakTimeRemaining = STATE.settings.bigBreakDuration * 60;
+      STATE.isRunning = true;
+      renderTimerDisplay();
+      startTick();
+      electronAPI.setPowerSave(true);
+      return;
+    }
+    const nextPhase = STATE.schedule.find(b => b.type === 'phase' && b.phaseIndex === STATE.currentPhaseIndex + 1);
+    if (nextPhase) {
+      STATE.currentPhaseIndex++;
+      STATE.intervals = generateIntervals();
+      STATE.currentIntervalIndex = 0;
+      STATE.timeRemaining = STATE.settings.studyDuration * 60;
+      STATE.activeTimerType = 'phase_intervals';
+      STATE.isRunning = true;
+      renderTimerDisplay();
+      startTick();
+      electronAPI.setPowerSave(true);
+      return;
+    }
+    // No more phases - session complete
+    STATE.activeTimerType = null;
+    STATE.isRunning = false;
+    STATE.isSessionComplete = true;
+    STATE.sessionCompleteStats = {
+      totalMinutes: Math.round(STATE.totalStudiedSeconds / 60),
+      phasesDone: STATE.currentPhaseIndex + 1,
+    };
+    showCompleteOverlay();
+    electronAPI.setPowerSave(false);
+    electronAPI.showNotification(t('sessionComplete'), `Done! ${Math.round(STATE.totalStudiedSeconds / 60)} minutes studied.`);
+    return;
+  }
+
+  // Big break end -> next phase
+  const nextPhase = STATE.schedule.find(b => b.type === 'phase' && b.phaseIndex === STATE.currentPhaseIndex + 1);
+  if (nextPhase) {
+    STATE.currentPhaseIndex++;
+    STATE.intervals = generateIntervals();
+    STATE.currentIntervalIndex = 0;
+    STATE.timeRemaining = STATE.settings.studyDuration * 60;
+    STATE.activeTimerType = 'phase_intervals';
+    STATE.isRunning = true;
+    renderTimerDisplay();
+    startTick();
+    electronAPI.setPowerSave(true);
+  } else {
+    STATE.activeTimerType = null;
+    STATE.isRunning = false;
+    STATE.isSessionComplete = true;
+    STATE.sessionCompleteStats = {
+      totalMinutes: Math.round(STATE.totalStudiedSeconds / 60),
+      phasesDone: STATE.currentPhaseIndex + 1,
+    };
+    showCompleteOverlay();
+    electronAPI.setPowerSave(false);
+    electronAPI.showNotification(t('sessionComplete'), `Done! ${Math.round(STATE.totalStudiedSeconds / 60)} minutes studied.`);
+  }
+}
+
+function showCompleteOverlay() {
+  document.getElementById('completePhases').textContent = STATE.sessionCompleteStats.phasesDone;
+  const m = STATE.sessionCompleteStats.totalMinutes;
+  document.getElementById('completeTime').textContent = `${Math.floor(m/60)}h ${m%60}m`;
+  document.getElementById('completeOverlay').style.display = 'flex';
+}
+
+function dismissComplete() {
+  document.getElementById('completeOverlay').style.display = 'none';
+  STATE.isSessionComplete = false;
+  STATE.sessionCompleteStats = null;
+  renderTimerDisplay();
+  renderSchedule();
+}
+
+// ==================== ACTIONS ====================
+function startTimerDirect() {
+  if (STATE.schedule.length === 0) return;
+  if (STATE.activeTimerType === 'waiting') { skipWait(); return; }
+  const type = STATE.activeTimerType || 'phase_intervals';
+  STATE.isRunning = true;
+  STATE.activeTimerType = type;
+  renderTimerDisplay();
+  startTick();
+  electronAPI.setPowerSave(true);
+}
+
+function pauseTimer() {
+  STATE.isRunning = false;
+  stopTick();
+  electronAPI.setPowerSave(false);
+  renderTimerDisplay();
+}
+
+function resumeTimer() {
+  STATE.isRunning = true;
+  renderTimerDisplay();
+  startTick();
+  electronAPI.setPowerSave(true);
+}
+
+function skipWait() {
+  STATE.isWaitingToStart = false;
+  STATE.waitingUntil = null;
+  STATE.activeTimerType = 'phase_intervals';
+  STATE.intervals = generateIntervals();
+  STATE.currentIntervalIndex = 0;
+  STATE.timeRemaining = STATE.settings.studyDuration * 60;
+  STATE.isRunning = true;
+  stopTick();
+  renderTimerDisplay();
+  startTick();
+  electronAPI.setPowerSave(true);
+}
+
+function clearSchedule() {
+  stopTick();
+  if (autoContinueInterval) { clearInterval(autoContinueInterval); autoContinueInterval = null; }
+  STATE.schedule = [];
+  STATE.intervals = [];
+  STATE.currentPhaseIndex = 0;
+  STATE.currentIntervalIndex = 0;
+  STATE.timeRemaining = STATE.settings.studyDuration * 60;
+  STATE.bigBreakTimeRemaining = STATE.settings.bigBreakDuration * 60;
+  STATE.isRunning = false;
+  STATE.activeTimerType = null;
+  STATE.isWaitingToStart = false;
+  STATE.waitingUntil = null;
+  STATE.tierBAlert = false;
+  STATE.tierBType = null;
+  STATE.suggestion = null;
+  document.getElementById('alertOverlay').style.display = 'none';
+  document.getElementById('completeOverlay').style.display = 'none';
+  electronAPI.setPowerSave(false);
+  electronAPI.updateTray('');
+  renderTimerDisplay();
+  renderTimeline();
+  renderSchedule();
+}
+
+// ==================== CONSOLE ====================
+async function sendCommand() {
+  const input = document.getElementById('consoleInput').value.trim();
+  if (!input || STATE.isConsoleLocked) return;
+
+  STATE.isConsoleLocked = true;
+  STATE.isParsing = true;
+  STATE.error = null;
+  document.getElementById('sendBtn').disabled = true;
+  document.getElementById('sendBtn').innerHTML = '<div class="spinner"></div>';
+  document.getElementById('errorArea').style.display = 'none';
+
+  try {
+    const trimmed = input.toLowerCase();
+
+    // Extend/delay
+    const isExtend = /extend|delay|مد|زد|طول|وسع|زيادة|أخر|اجل|تأخير/.test(trimmed);
+    if (isExtend) {
+      const result = await processAdjustment(input);
+      STATE.schedule = normalizeSchedule(result.phases);
+      renderTimeline();
+      renderSchedule();
+    } else {
+      const parsed = await parseSchedule(input);
+      STATE.schedule = parsed.phases;
+      STATE.suggestion = parsed.suggestion || null;
+
+      const first = STATE.schedule[0];
+      const nowMs = new Date().getTime();
+      const firstStart = new Date(first.startTime).getTime();
+      const secsUntil = Math.round((firstStart - nowMs) / 1000);
+
+      if (secsUntil > 10) {
+        STATE.intervals = [];
+        STATE.currentPhaseIndex = 0;
+        STATE.currentIntervalIndex = 0;
+        STATE.timeRemaining = secsUntil;
+        STATE.isRunning = true;
+        STATE.activeTimerType = 'waiting';
+        STATE.isWaitingToStart = true;
+        STATE.waitingUntil = first.startTime;
+        stopTick();
+        renderTimerDisplay();
+        // Start wait tick
+        tickId = setInterval(() => {
+          if (STATE.timeRemaining > 0) STATE.timeRemaining--;
+          else {
+            clearInterval(tickId); tickId = null;
+            // Auto-start
+            STATE.isWaitingToStart = false;
+            STATE.waitingUntil = null;
+            STATE.activeTimerType = 'phase_intervals';
+            STATE.intervals = generateIntervals();
+            STATE.currentIntervalIndex = 0;
+            STATE.timeRemaining = STATE.settings.studyDuration * 60;
+            STATE.isRunning = true;
+            renderTimerDisplay();
+            startTick();
+            electronAPI.setPowerSave(true);
+            electronAPI.showNotification('Phase Study', 'Schedule started! Time to study.');
+          }
+          renderTimerDisplay();
+        }, 1000);
+      } else {
+        STATE.intervals = generateIntervals();
+        STATE.currentPhaseIndex = 0;
+        STATE.currentIntervalIndex = 0;
+        STATE.timeRemaining = STATE.settings.studyDuration * 60;
+        STATE.isRunning = true;
+        STATE.activeTimerType = 'phase_intervals';
+        STATE.isWaitingToStart = false;
+        STATE.waitingUntil = null;
+        renderTimerDisplay();
+        startTick();
+        electronAPI.setPowerSave(true);
+      }
+    }
+  } catch (err) {
+    STATE.error = err.message || 'Failed to process command';
+    document.getElementById('errorArea').style.display = 'block';
+    document.getElementById('errorText').textContent = STATE.error;
+  }
+
+  document.getElementById('consoleInput').value = '';
+  STATE.isConsoleLocked = false;
+  STATE.isParsing = false;
+  document.getElementById('sendBtn').disabled = false;
+  document.getElementById('sendBtn').innerHTML = '→';
+  renderTimeline();
+  renderSchedule();
+  STATE.version++;
+}
+
+// ==================== RENDER ====================
+function formatTime(s) {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
+function formatTimeLabel(iso) {
+  const d = new Date(iso);
+  let h = d.getHours();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${String(d.getMinutes()).padStart(2, '0')} ${ampm}`;
+}
+
+function renderTimeline() {
+  const area = document.getElementById('timelineArea');
+  if (STATE.schedule.length === 0) {
+    area.innerHTML = `<div class="schedule-empty"><h3>${t('noSchedule')}</h3><p>${t('noScheduleHint')}</p></div>`;
+    document.getElementById('clearBtn').style.display = 'none';
+    return;
+  }
+  document.getElementById('clearBtn').style.display = 'inline-block';
+  area.innerHTML = STATE.schedule.map(b => {
+    if (b.type === 'phase') {
+      const isActive = b.phaseIndex === STATE.currentPhaseIndex && b.status !== 'completed';
+      const isDone = b.status === 'completed';
+      const badge = isActive ? t('active') : isDone ? t('done') : t('pending');
+      const badgeCls = isActive ? 'active' : isDone ? 'done' : 'pending';
+      return `<div class="phase-card ${isActive?'active':''} ${isDone?'done':''}">
+        <div>
+          <div class="phase-label ${isActive?'active':''}" style="color:${isActive ? 'var(--accent)' : isDone ? 'var(--success)' : 'var(--active)'}">${b.label}</div>
+          <div class="phase-time">${formatTimeLabel(b.startTime)} - ${formatTimeLabel(b.endTime)}</div>
+        </div>
+        <div class="phase-badge ${badgeCls}">${badge}</div>
+      </div>`;
+    }
+    const isActive = b.phaseIndex === STATE.currentPhaseIndex && b.status !== 'completed';
+    return `<div class="break-card ${isActive?'active':''}">
+      <div class="break-icon">☕</div>
+      <div>
+        <div class="break-label" style="color:${isActive ? 'var(--warning)' : 'var(--secondary)'}">${b.label}</div>
+        <div class="break-info">${formatTimeLabel(b.startTime)} - ${formatTimeLabel(b.endTime)} · ${b.duration} ${t('minRest')}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderSettings() {
+  const sett = STATE.settings;
+  const configs = [
+    { key: 'studyDuration', label: t('studyDuration'), min: 5, max: 60, step: 5 },
+    { key: 'shortBreakDuration', label: t('shortBreakDuration'), min: 1, max: 30, step: 1 },
+    { key: 'phaseDuration', label: t('phaseDuration'), min: 10, max: 240, step: 10 },
+    { key: 'bigBreakDuration', label: t('bigBreakDuration'), min: 5, max: 90, step: 5 },
+    { key: 'intervalsPerPhase', label: t('intervalsPerPhase'), min: 2, max: 8, step: 1 },
+  ];
+
+  document.getElementById('settingsList').innerHTML = configs.map(c =>
+    `<div class="setting-row">
+      <span class="setting-label">${c.label}</span>
+      <div class="setting-control">
+        <button class="setting-btn" onclick="adjSetting('${c.key}', -${c.step})">−</button>
+        <span class="setting-value">${sett[c.key]}${c.key === 'intervalsPerPhase' ? '' : ` ${t('minutes')}`}</span>
+        <button class="setting-btn" onclick="adjSetting('${c.key}', ${c.step})">+</button>
+      </div>
+    </div>`
+  ).join('');
+
+  document.getElementById('soundSettings').innerHTML = `
+    <div class="setting-row">
+      <span class="setting-label">${t('soundEnabled')}</span>
+      <div class="toggle ${sett.soundEnabled ? 'on' : ''}" onclick="toggleSetting('soundEnabled')"><div class="toggle-knob"></div></div>
+    </div>
+    <div class="setting-row">
+      <span class="setting-label">${t('tierBEnabled')}</span>
+      <div class="toggle ${sett.tierBEnabled ? 'on' : ''}" onclick="toggleSetting('tierBEnabled')"><div class="toggle-knob"></div></div>
+    </div>`;
+
+  document.getElementById('autoContinueSettings').innerHTML = `
+    <div class="setting-row">
+      <span class="setting-label">${t('autoContinue')}</span>
+      <div class="toggle ${sett.autoContinue ? 'on' : ''}" onclick="toggleSetting('autoContinue')"><div class="toggle-knob"></div></div>
+    </div>`;
+}
+
+function adjSetting(key, delta) {
+  const cfg = { studyDuration: [5,60], shortBreakDuration: [1,30], phaseDuration: [10,240], bigBreakDuration: [5,90], intervalsPerPhase: [2,8] };
+  const [min, max] = cfg[key];
+  const cur = STATE.settings[key];
+  const next = Math.min(max, Math.max(min, cur + delta));
+  if (next !== cur) {
+    STATE.settings = { ...STATE.settings, [key]: next };
+    renderSettings();
+    saveSettings();
+  }
+}
+
+function toggleSetting(key) {
+  STATE.settings = { ...STATE.settings, [key]: !STATE.settings[key] };
+  renderSettings();
+  saveSettings();
+}
+
+function saveSettings() {
+  localStorage.setItem('phase_study_settings', JSON.stringify(STATE.settings));
+}
+
+function loadSettings() {
+  try {
+    const saved = localStorage.getItem('phase_study_settings');
+    if (saved) STATE.settings = { ...STATE.settings, ...JSON.parse(saved) };
+  } catch (_) {}
+  renderSettings();
+}
+
+// ==================== SCHEDULE TAB ====================
+function renderSchedule() {
+  renderStats();
+  renderTimeline();
+  const tl = document.getElementById('scheduleTimeline');
+  if (STATE.schedule.length === 0) {
+    tl.innerHTML = `<div class="schedule-empty"><h3>${t('noSchedule')}</h3><p>${t('noScheduleHint')}</p></div>`;
+    return;
+  }
+  tl.innerHTML = document.getElementById('timelineArea').innerHTML;
+}
+
+function renderStats() {
+  const hasData = STATE.totalStudiedSeconds > 0 || STATE.schedule.length > 0;
+  document.getElementById('statsCards').style.display = hasData ? 'block' : 'none';
+  document.getElementById('statsEmpty').style.display = hasData ? 'none' : 'block';
+  if (!hasData) return;
+
+  const hours = Math.floor(STATE.totalStudiedSeconds / 3600);
+  const mins = Math.floor((STATE.totalStudiedSeconds % 3600) / 60);
+  const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+
+  document.getElementById('summaryCards').innerHTML = `
+    <div class="stat-card"><div class="stat-num">${timeStr}</div><div class="stat-label">${t('studiedLabel')}</div></div>
+    <div class="stat-card"><div class="stat-num">${STATE.sessionHistory.length}</div><div class="stat-label">${t('phasesCompleted')}</div></div>`;
+
+  // Weekly chart
+  const weekDays = [];
+  const now = new Date();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now); d.setDate(d.getDate() - i);
+    weekDays.push(d.toISOString().slice(0, 10));
+  }
+
+  const weekData = weekDays.map(d => {
+    const secs = STATE.dailyHistory[d] || 0;
+    const hrs = Math.round(secs / 3600 * 10) / 10;
+    return { date: d, label: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(d).getDay()], hours: hrs };
+  });
+  const maxH = Math.max(...weekData.map(d => d.hours), 0.5);
+  const todayStr = todayKey();
+
+  document.getElementById('barChart').innerHTML = weekData.map(d => {
+    const h = maxH > 0 ? (d.hours / maxH) * 140 : 0;
+    const isToday = d.date === todayStr;
+    return `<div class="bar-col">
+      <div class="bar-value">${d.hours > 0 ? d.hours : ''}</div>
+      <div class="bar ${isToday ? 'today' : ''}" style="height:${Math.max(h, d.hours > 0 ? 4 : 0)}px;background:${isToday ? 'var(--accent)' : 'var(--card)'}"></div>
+      <div class="bar-label ${isToday ? 'today' : ''}">${d.label}</div>
+    </div>`;
+  }).join('');
+
+  const weekTotal = weekData.reduce((s, d) => s + d.hours, 0);
+  const avg = weekDays.length > 0 ? Math.round(weekTotal / weekDays.length * 10) / 10 : 0;
+  document.getElementById('avgRow').innerHTML = `
+    <span>${t('dailyAvg')}: ${avg}h</span>
+    <span>${STATE.sessionHistory.length} ${t('phasesCompleted')}</span>`;
+
+  // Recent sessions
+  if (STATE.sessionHistory.length > 0) {
+    document.getElementById('historyCard').style.display = 'block';
+    document.getElementById('historyList').innerHTML = [...STATE.sessionHistory].reverse().slice(0, 10).map(s =>
+      `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card)">
+        <span style="font-size:12px;color:var(--secondary)">${new Date(s.completedAt).toLocaleDateString()}</span>
+        <span style="font-size:12px;color:var(--accent)">${t('phase')} ${s.phaseIndex + 1}</span>
+      </div>`
+    ).join('');
+  } else {
+    document.getElementById('historyCard').style.display = 'none';
+  }
+}
+
+function showStatsTab() {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab')[2].click();
+}
+
+function handleClear() {
+  if (confirm(`${t('clear')} ${t('schedule')}?`)) clearSchedule();
+}
+
+// ==================== TABS ====================
+document.getElementById('tabs').addEventListener('click', e => {
+  const tab = e.target.closest('.tab');
+  if (!tab) return;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
+  if (tab.dataset.tab === 'schedule') renderSchedule();
+  if (tab.dataset.tab === 'settings') renderSettings();
+});
+
+// ==================== KEYBOARD ====================
+document.getElementById('consoleInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendCommand();
+});
+
+// ==================== INIT ====================
+loadSettings();
+updateUIStrings();
+renderTimerDisplay();
+renderTimeline();
+renderSchedule();
+</script>
+</body>
+</html>
