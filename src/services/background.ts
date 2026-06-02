@@ -80,4 +80,10 @@ export const BackgroundService = {
     ensureEmitter();
     attachListeners();
   },
+
+  scheduleReminder: async (message: string, timestampMs: number): Promise<number | null> => {
+    if (Platform.OS !== 'android' || !TimerModule?.scheduleReminder) return null;
+    try { return await TimerModule.scheduleReminder(message, timestampMs); }
+    catch { return null; }
+  },
 };

@@ -38,6 +38,13 @@ export interface StudySession {
   completedAt: string;
 }
 
+export interface Reminder {
+  id: string;
+  message: string;
+  time: string; // ISO string of when it's scheduled
+  createdAt: string;
+}
+
 export interface AppSettings {
   studyDuration: number;       // minutes per study interval
   shortBreakDuration: number;  // minutes per short break
@@ -70,6 +77,7 @@ export interface AppState {
   totalStudiedSeconds: number;
   dailyHistory: Record<string, number>;  // "YYYY-MM-DD" → seconds studied
   sessionHistory: StudySession[];
+  pendingReminders: Reminder[];
   settings: AppSettings;
   isSessionComplete: boolean;
   sessionCompleteStats: { totalMinutes: number; phasesDone: number } | null;
@@ -92,4 +100,6 @@ export interface AppState {
   syncFromService: () => Promise<void>;
   updateSettings: (settings: Partial<AppSettings>) => void;
   dismissSessionComplete: () => void;
+  addReminder: (message: string, time: string) => Promise<void>;
+  removeReminder: (id: string) => void;
 }

@@ -1,5 +1,5 @@
 import { create } from '../lib/zustand';
-import { AppState, AppSettings, ScheduleBlock, StudyInterval, TierBType } from '../types';
+import { AppState, AppSettings, Reminder, ScheduleBlock, StudyInterval, TierBType } from '../types';
 import {
   generateScheduleBlocks,
   generateIntervals,
@@ -12,7 +12,7 @@ import {
   PHASE_DURATION,
   INTERVALS_PER_PHASE,
 } from '../utils/schedule';
-import { parseSchedule, processAdjustment } from '../services/gemini';
+import { parseSchedule, processAdjustment, extractReminder } from '../services/gemini';
 import { playTierAAlert, playTierBAlert, stopTierBAlert } from '../services/audio';
 import { BackgroundService } from '../services/background';
 
@@ -64,6 +64,7 @@ export const useStore = create<AppState>((set, get) => ({
   totalStudiedSeconds: 0,
   dailyHistory: {},
   sessionHistory: [],
+  pendingReminders: [],
   isSessionComplete: false,
   sessionCompleteStats: null,
   settings: {
@@ -86,6 +87,20 @@ export const useStore = create<AppState>((set, get) => ({
 
     try {
       const trimmed = input.trim().toLowerCase();
+
+      // 🕐 Reminder command
+      const reminderKeywords = /remind|ذكر|تنبيه|نب(|ه|ّ)|نبه|اذكر/i;
+      if (reminderKeywords.test(trimmed) || trimmed.startsWith('add') || trimmed.startsWith('set')) {
+        const reminder = await extractReminder(input);
+        if (reminder) {
+          get().addReminder(reminder.action, reminder.time);
+        } else {
+          set({ error: 'Could not understand that reminder. Try: "remind me to stretch at 6pm" or "ذكرني أتمرن الساعة 7"', isParsing: false });
+        }
+        set({ consoleInput: '', isConsoleLocked: false });
+        return;
+      }
+
       const arabicExtend = /مد|زد|طول|وسع|زيادة/.test(trimmed);
       const arabicDelay = /أخر|اجل|تأخير/.test(trimmed);
       if (trimmed.includes('extend') || trimmed.includes('delay') || arabicExtend || arabicDelay) {
@@ -468,5 +483,26 @@ export const useStore = create<AppState>((set, get) => ({
 
   dismissSessionComplete: () => {
     set({ isSessionComplete: false, sessionCompleteStats: null });
+  },
+
+  addReminder: async (message: string, time: string) => {
+    const ts = new Date(time).getTime();
+    const id = await BackgroundService.scheduleReminder(message, ts);
+    if (id === null) {
+      set({ error: 'Could not schedule reminder. Check exact alarm permission.' });
+      return;
+    }
+    const reminder: Reminder = { id: String(id), message, time, createdAt: new Date().toISOString() };
+    set((s) => ({
+      pendingReminders: [...s.pendingReminders, reminder],
+      version: s.version + 1,
+    }));
+  },
+
+  removeReminder: (id: string) => {
+    set((s) => ({
+      pendingReminders: s.pendingReminders.filter((r) => r.id !== id),
+      version: s.version + 1,
+    }));
   },
 }));

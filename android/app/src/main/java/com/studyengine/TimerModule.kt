@@ -1,5 +1,7 @@
 package com.studyengine
 
+import android.app.AlarmManager
+import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
 import com.facebook.react.bridge.Arguments
@@ -119,6 +121,40 @@ class TimerModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
       promise.resolve(true)
     } catch (e: Exception) {
       promise.reject("AUDIO_ERROR", e.message)
+    }
+  }
+
+  @ReactMethod
+  fun scheduleReminder(message: String, timestampMs: Double, promise: Promise) {
+    try {
+      val ctx = reactApplicationContext
+      val alarmManager = ctx.getSystemService(android.content.Context.ALARM_SERVICE) as AlarmManager
+      val id = (1000..9999).random()
+
+      val intent = Intent(ctx, AlarmReceiver::class.java).apply {
+        putExtra("message", message)
+        putExtra("reminder_id", id)
+      }
+      val pendingIntent = PendingIntent.getBroadcast(
+        ctx, id, intent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+      )
+
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        if (alarmManager.canScheduleExactAlarms()) {
+          alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timestampMs.toLong(), pendingIntent)
+        } else {
+          alarmManager.set(AlarmManager.RTC_WAKEUP, timestampMs.toLong(), pendingIntent)
+        }
+      } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+        alarmManager.setExact(AlarmManager.RTC_WAKEUP, timestampMs.toLong(), pendingIntent)
+      } else {
+        alarmManager.set(AlarmManager.RTC_WAKEUP, timestampMs.toLong(), pendingIntent)
+      }
+
+      promise.resolve(id)
+    } catch (e: Exception) {
+      promise.reject("ALARM_ERROR", e.message)
     }
   }
 }

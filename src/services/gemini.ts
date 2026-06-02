@@ -343,3 +343,43 @@ export async function processAdjustment(
 
   return { phases: currentSchedule, message: 'Command not recognized. Try "extend break by 15 minutes", "delay Phase 2 by 10", or "مدد الاستراحة 15 دقيقة".' };
 }
+
+const REMINDER_PROMPT = `You are a reminder/alert extractor. Accept input in ANY language.
+
+Extract what the user wants to be reminded about and at what time.
+
+Rules:
+- Understand natural language time expressions in any language
+- Return ONLY valid JSON, no markdown, no explanation
+- If the user says something like "remind me to stretch at 6pm" → extract the action and time
+- If the user says something like "add a gym break at 7" → extract that
+- If the text is NOT a reminder (e.g. it's a question or random chat), return {"type": "unknown"}
+- Output times in 12-hour format with AM/PM
+- Infer AM/PM from context
+
+Examples:
+- "remind me to stretch at 6:00 PM" → {"type": "reminder", "action": "Time to stretch!", "time": "6:00 PM"}
+- "ذكرني أتمرن الساعة 7" → {"type": "reminder", "action": "وقت التمرين!", "time": "7:00 PM"}
+- "add a gym break at 8:30" → {"type": "reminder", "action": "Go to the gym!", "time": "8:30 PM"}
+- "what is the meaning of life" → {"type": "unknown"}
+
+Output EXACTLY this format:
+{"type": "reminder"|"unknown", "action": "...", "time": "..."}`;
+
+export async function extractReminder(input: string): Promise<{ action: string; time: string } | null> {
+  try {
+    const prompt = `${REMINDER_PROMPT}\n\nUser: "${input}"\nCurrent time: ${new Date().toISOString()}`;
+    let raw = await callGemini(prompt);
+    const jm = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (jm) raw = jm[1];
+    const bm = raw.match(/\{[\s\S]*\}/);
+    if (!bm) return null;
+    const data = JSON.parse(bm[0]);
+    if (data.type !== 'reminder') return null;
+    const date = parseTimeString(data.time);
+    if (!date) return null;
+    return { action: data.action, time: date.toISOString() };
+  } catch {
+    return null;
+  }
+}
