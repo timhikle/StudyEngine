@@ -50,9 +50,9 @@ export const BackgroundService = {
     catch { return false; }
   },
 
-  setRemaining: async (seconds: number): Promise<boolean> => {
+  setRemaining: async (seconds: number, timerType?: string): Promise<boolean> => {
     if (Platform.OS !== 'android' || !TimerModule?.setRemaining) return false;
-    try { await TimerModule.setRemaining(seconds); return true; }
+    try { await TimerModule.setRemaining(seconds, timerType || ''); return true; }
     catch { return false; }
   },
 

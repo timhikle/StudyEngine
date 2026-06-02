@@ -8,9 +8,13 @@ import android.app.Service
 import android.content.Intent
 import android.os.Build
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
 import com.facebook.react.ReactApplication
 import com.facebook.react.bridge.ReactContext
@@ -28,12 +32,15 @@ class TimerService : Service() {
       private set
   }
 
-  private val handler = Handler(Looper.getMainLooper())
+  private var handlerThread: HandlerThread? = null
+  private var handler: Handler? = null
   private var wakeLock: PowerManager.WakeLock? = null
 
   override fun onCreate() {
     super.onCreate()
     createNotificationChannel()
+    handlerThread = HandlerThread("TimerThread").apply { start() }
+    handler = Handler(handlerThread!!.looper)
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -49,6 +56,8 @@ class TimerService : Service() {
       "STOP" -> {
         stopTicking()
         isRunning = false
+        releaseWakeLock()
+        stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
       }
       "PAUSE" -> {
@@ -65,6 +74,8 @@ class TimerService : Service() {
       }
       "SET_REMAINING" -> {
         remainingSeconds = intent.getIntExtra("remainingSeconds", remainingSeconds)
+        val newType = intent.getStringExtra("timerType")
+        if (newType != null) activeTimerType = newType
         updateNotification()
       }
     }
@@ -77,12 +88,14 @@ class TimerService : Service() {
     stopTicking()
     isRunning = false
     releaseWakeLock()
+    handlerThread?.quitSafely()
+    handlerThread = null
     stopForeground(STOP_FOREGROUND_REMOVE)
     super.onDestroy()
   }
 
   private fun startTicking() {
-    handler.post(object : Runnable {
+    handler?.post(object : Runnable {
       override fun run() {
         if (!isRunning) return
         if (remainingSeconds <= 0) {
@@ -90,23 +103,67 @@ class TimerService : Service() {
           return
         }
         remainingSeconds--
+        // Re-acquire wake lock with 3s timeout each tick to prevent deep sleep delays
+        reacquireWakeLock()
         updateNotification()
         emitEvent("onTimerTick", remainingSeconds)
-        handler.postDelayed(this, 1000)
+        handler?.postDelayed(this, 1000)
       }
     })
   }
 
   private fun stopTicking() {
-    handler.removeCallbacksAndMessages(null)
+    handler?.removeCallbacksAndMessages(null)
   }
 
   private fun onTimerComplete() {
     isRunning = false
     stopTicking()
     releaseWakeLock()
+    // Vibrate to alert user that countdown finished
+    vibrate()
+    // If this was a waiting timer, show a "Starting now" notification
+    if (activeTimerType == "waiting") {
+      showStartingNotification()
+    }
     emitEvent("onTimerComplete", 0)
     updateNotification()
+  }
+
+  private fun vibrate() {
+    try {
+      val vib = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val vm = getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager
+        vm.defaultVibrator
+      } else {
+        @Suppress("DEPRECATION")
+        getSystemService(VIBRATOR_SERVICE) as Vibrator
+      }
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        vib.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE))
+      } else {
+        @Suppress("DEPRECATION")
+        vib.vibrate(500)
+      }
+    } catch (_: Exception) {}
+  }
+
+  private fun showStartingNotification() {
+    val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+    val intent = packageManager.getLaunchIntentForPackage(packageName)
+    val pendingIntent = PendingIntent.getActivity(
+      this, 1, intent,
+      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+    val notif = NotificationCompat.Builder(this, CHANNEL_ID)
+      .setContentTitle("Phase Study")
+      .setContentText("Schedule started! Time to study.")
+      .setSmallIcon(com.studyengine.R.mipmap.ic_launcher)
+      .setAutoCancel(true)
+      .setContentIntent(pendingIntent)
+      .setPriority(NotificationCompat.PRIORITY_HIGH)
+      .build()
+    manager.notify(NOTIFICATION_ID + 1, notif)
   }
 
   private fun updateNotification() {
@@ -118,7 +175,11 @@ class TimerService : Service() {
     val min = remainingSeconds / 60
     val sec = remainingSeconds % 60
     val timeStr = String.format("%02d:%02d", min, sec)
-    val label = if (activeTimerType == "big_break") "Big Break" else "Study Phase"
+    val label = when (activeTimerType) {
+      "big_break" -> "Big Break"
+      "waiting" -> "Starting in"
+      else -> "Study Phase"
+    }
 
     val intent = packageManager.getLaunchIntentForPackage(packageName)
     val pendingIntent = PendingIntent.getActivity(
@@ -126,25 +187,32 @@ class TimerService : Service() {
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
-    return NotificationCompat.Builder(this, CHANNEL_ID)
+    val notif = NotificationCompat.Builder(this, CHANNEL_ID)
       .setContentTitle("Phase Study - $label")
-      .setContentText("$timeStr remaining")
+      .setContentText(if (activeTimerType == "waiting") "$timeStr until start" else "$timeStr remaining")
       .setSmallIcon(com.studyengine.R.mipmap.ic_launcher)
       .setOngoing(true)
       .setContentIntent(pendingIntent)
       .setPriority(NotificationCompat.PRIORITY_HIGH)
       .setCategory(NotificationCompat.CATEGORY_SERVICE)
-      .build()
+      .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      notif.setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+    }
+
+    return notif.build()
   }
 
   private fun createNotificationChannel() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       val channel = NotificationChannel(
         CHANNEL_ID, "Timer Service",
-        NotificationManager.IMPORTANCE_LOW
+        NotificationManager.IMPORTANCE_HIGH
       ).apply {
-        description = "Shows timer progress in background"
-        setShowBadge(false)
+        description = "Shows timer progress and alerts"
+        setShowBadge(true)
+        enableVibration(true)
       }
       val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
       manager.createNotificationChannel(channel)
@@ -157,8 +225,19 @@ class TimerService : Service() {
       wakeLock = power.newWakeLock(
         PowerManager.PARTIAL_WAKE_LOCK, "PhaseStudy:TimerLock"
       )
-      wakeLock?.acquire()
+      wakeLock?.acquire(3000)
     }
+  }
+
+  private fun reacquireWakeLock() {
+    wakeLock?.let {
+      it.release()
+    }
+    val power = getSystemService(POWER_SERVICE) as PowerManager
+    wakeLock = power.newWakeLock(
+      PowerManager.PARTIAL_WAKE_LOCK, "PhaseStudy:TimerLock"
+    )
+    wakeLock?.acquire(3000)
   }
 
   private fun releaseWakeLock() {

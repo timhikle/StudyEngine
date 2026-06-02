@@ -81,12 +81,13 @@ class TimerModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
   }
 
   @ReactMethod
-  fun setRemaining(seconds: Int, promise: Promise) {
+  fun setRemaining(seconds: Int, timerType: String, promise: Promise) {
     try {
       reactApplicationContext.startService(
         Intent(reactApplicationContext, TimerService::class.java).apply {
           action = "SET_REMAINING"
           putExtra("remainingSeconds", seconds)
+          putExtra("timerType", timerType)
         }
       )
       promise.resolve(true)
