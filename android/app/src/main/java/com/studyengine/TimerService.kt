@@ -1,16 +1,18 @@
 package com.studyengine
 
+import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
-import android.os.Looper
 import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -24,6 +26,8 @@ class TimerService : Service() {
   companion object {
     const val CHANNEL_ID = "timer_channel"
     const val NOTIFICATION_ID = 1001
+    const val ALARM_REQUEST_CODE = 2001
+    const val PREFS_NAME = "timer_state"
     var isRunning = false
       private set
     var remainingSeconds = 0
@@ -35,12 +39,16 @@ class TimerService : Service() {
   private var handlerThread: HandlerThread? = null
   private var handler: Handler? = null
   private var wakeLock: PowerManager.WakeLock? = null
+  private var prefs: SharedPreferences? = null
+  private var alarmManager: AlarmManager? = null
 
   override fun onCreate() {
     super.onCreate()
     createNotificationChannel()
     handlerThread = HandlerThread("TimerThread").apply { start() }
     handler = Handler(handlerThread!!.looper)
+    prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    alarmManager = getSystemService(ALARM_SERVICE) as? AlarmManager
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -48,15 +56,19 @@ class TimerService : Service() {
       "START" -> {
         remainingSeconds = intent.getIntExtra("totalSeconds", 60)
         activeTimerType = intent.getStringExtra("timerType") ?: "phase_intervals"
+        persistState()
         startForeground(NOTIFICATION_ID, buildNotification())
         isRunning = true
         acquireWakeLock()
+        scheduleAlarmFallback()
         startTicking()
       }
       "STOP" -> {
         stopTicking()
         isRunning = false
         releaseWakeLock()
+        cancelAlarmFallback()
+        clearPersistedState()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
       }
@@ -64,11 +76,14 @@ class TimerService : Service() {
         stopTicking()
         isRunning = false
         releaseWakeLock()
+        cancelAlarmFallback()
+        persistState()
         updateNotification()
       }
       "RESUME" -> {
         isRunning = true
         acquireWakeLock()
+        scheduleAlarmFallback()
         startTicking()
         updateNotification()
       }
@@ -76,10 +91,24 @@ class TimerService : Service() {
         remainingSeconds = intent.getIntExtra("remainingSeconds", remainingSeconds)
         val newType = intent.getStringExtra("timerType")
         if (newType != null) activeTimerType = newType
+        persistState()
         updateNotification()
       }
+      "RESTORE" -> {
+        if (!isRunning && prefs?.contains("remainingSeconds") == true) {
+          remainingSeconds = prefs?.getInt("remainingSeconds", 60) ?: 60
+          activeTimerType = prefs?.getString("timerType", "phase_intervals") ?: "phase_intervals"
+          if (remainingSeconds > 0) {
+            isRunning = true
+            startForeground(NOTIFICATION_ID, buildNotification())
+            acquireWakeLock()
+            scheduleAlarmFallback()
+            startTicking()
+          }
+        }
+      }
     }
-    return START_STICKY
+    return START_REDELIVER_INTENT
   }
 
   override fun onBind(intent: Intent?): IBinder? = null
@@ -94,6 +123,65 @@ class TimerService : Service() {
     super.onDestroy()
   }
 
+  override fun onTaskRemoved(rootIntent: Intent?) {
+    // User swiped away app — keep service alive
+    val restart = Intent(this, TimerService::class.java).apply { action = "RESTORE" }
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      startForegroundService(restart)
+    } else {
+      startService(restart)
+    }
+    super.onTaskRemoved(rootIntent)
+  }
+
+  private fun persistState() {
+    prefs?.edit()?.apply {
+      putInt("remainingSeconds", remainingSeconds)
+      putString("timerType", activeTimerType)
+      putBoolean("wasRunning", true)
+      apply()
+    }
+  }
+
+  private fun clearPersistedState() {
+    prefs?.edit()?.clear()?.apply()
+  }
+
+  private fun scheduleAlarmFallback() {
+    if (remainingSeconds <= 0) return
+    val triggerMs = System.currentTimeMillis() + remainingSeconds * 1000L
+    val intent = Intent(this, AlarmReceiver::class.java).apply {
+      putExtra("type", "timer_complete")
+      putExtra("timer_type", activeTimerType)
+    }
+    val pendingIntent = PendingIntent.getBroadcast(
+      this, ALARM_REQUEST_CODE, intent,
+      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+    try {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        if (alarmManager?.canScheduleExactAlarms() == true) {
+          alarmManager?.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMs, pendingIntent)
+        } else {
+          alarmManager?.set(AlarmManager.RTC_WAKEUP, triggerMs, pendingIntent)
+        }
+      } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+        alarmManager?.setExact(AlarmManager.RTC_WAKEUP, triggerMs, pendingIntent)
+      } else {
+        alarmManager?.set(AlarmManager.RTC_WAKEUP, triggerMs, pendingIntent)
+      }
+    } catch (_: Exception) {}
+  }
+
+  private fun cancelAlarmFallback() {
+    val intent = Intent(this, AlarmReceiver::class.java).apply { putExtra("type", "timer_complete") }
+    val pendingIntent = PendingIntent.getBroadcast(
+      this, ALARM_REQUEST_CODE, intent,
+      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_NO_CREATE
+    )
+    pendingIntent?.let { alarmManager?.cancel(it) }
+  }
+
   private fun startTicking() {
     handler?.post(object : Runnable {
       override fun run() {
@@ -103,8 +191,6 @@ class TimerService : Service() {
           return
         }
         remainingSeconds--
-        // Re-acquire wake lock with 3s timeout each tick to prevent deep sleep delays
-        reacquireWakeLock()
         updateNotification()
         emitEvent("onTimerTick", remainingSeconds)
         handler?.postDelayed(this, 1000)
@@ -120,11 +206,17 @@ class TimerService : Service() {
     isRunning = false
     stopTicking()
     releaseWakeLock()
-    // Vibrate to alert user that countdown finished
+    cancelAlarmFallback()
+    clearPersistedState()
     vibrate()
-    // If this was a waiting timer, show a "Starting now" notification
     if (activeTimerType == "waiting") {
-      showStartingNotification()
+      showNotification("Phase Study", "Schedule started! Time to study.", false)
+    } else {
+      val label = when (activeTimerType) {
+        "big_break" -> "Break over!"
+        else -> "Study phase complete!"
+      }
+      showNotification("Phase Study - Timer Done", label, true)
     }
     emitEvent("onTimerComplete", 0)
     updateNotification()
@@ -140,30 +232,33 @@ class TimerService : Service() {
         getSystemService(VIBRATOR_SERVICE) as Vibrator
       }
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        vib.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE))
+        vib.vibrate(VibrationEffect.createOneShot(1000, VibrationEffect.DEFAULT_AMPLITUDE))
       } else {
         @Suppress("DEPRECATION")
-        vib.vibrate(500)
+        vib.vibrate(1000)
       }
     } catch (_: Exception) {}
   }
 
-  private fun showStartingNotification() {
-    val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-    val intent = packageManager.getLaunchIntentForPackage(packageName)
-    val pendingIntent = PendingIntent.getActivity(
-      this, 1, intent,
-      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-    )
-    val notif = NotificationCompat.Builder(this, CHANNEL_ID)
-      .setContentTitle("Phase Study")
-      .setContentText("Schedule started! Time to study.")
-      .setSmallIcon(com.studyengine.R.mipmap.ic_launcher)
-      .setAutoCancel(true)
-      .setContentIntent(pendingIntent)
-      .setPriority(NotificationCompat.PRIORITY_HIGH)
-      .build()
-    manager.notify(NOTIFICATION_ID + 1, notif)
+  private fun showNotification(title: String, text: String, autoCancel: Boolean) {
+    try {
+      val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+      val intent = packageManager.getLaunchIntentForPackage(packageName)
+      val pendingIntent = PendingIntent.getActivity(
+        this, 2, intent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+      )
+      val notif = NotificationCompat.Builder(this, CHANNEL_ID)
+        .setContentTitle(title)
+        .setContentText(text)
+        .setSmallIcon(com.studyengine.R.mipmap.ic_launcher)
+        .setAutoCancel(autoCancel)
+        .setContentIntent(pendingIntent)
+        .setPriority(NotificationCompat.PRIORITY_HIGH)
+        .setCategory(NotificationCompat.CATEGORY_ALARM)
+        .build()
+      manager.notify(NOTIFICATION_ID + 2, notif)
+    } catch (_: Exception) {}
   }
 
   private fun updateNotification() {
@@ -213,6 +308,7 @@ class TimerService : Service() {
         description = "Shows timer progress and alerts"
         setShowBadge(true)
         enableVibration(true)
+        enableLights(true)
       }
       val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
       manager.createNotificationChannel(channel)
@@ -220,30 +316,21 @@ class TimerService : Service() {
   }
 
   private fun acquireWakeLock() {
-    if (wakeLock == null) {
-      val power = getSystemService(POWER_SERVICE) as PowerManager
-      wakeLock = power.newWakeLock(
-        PowerManager.PARTIAL_WAKE_LOCK, "PhaseStudy:TimerLock"
-      )
-      wakeLock?.acquire(3000)
-    }
-  }
-
-  private fun reacquireWakeLock() {
-    wakeLock?.let {
-      it.release()
-    }
-    val power = getSystemService(POWER_SERVICE) as PowerManager
-    wakeLock = power.newWakeLock(
-      PowerManager.PARTIAL_WAKE_LOCK, "PhaseStudy:TimerLock"
-    )
-    wakeLock?.acquire(3000)
+    try {
+      if (wakeLock == null || !wakeLock!!.isHeld) {
+        val power = getSystemService(POWER_SERVICE) as PowerManager
+        wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "PhaseStudy:TimerLock")
+        wakeLock?.acquire()
+      }
+    } catch (_: Exception) {}
   }
 
   private fun releaseWakeLock() {
-    wakeLock?.let {
-      if (it.isHeld) it.release()
-    }
+    try {
+      wakeLock?.let {
+        if (it.isHeld) it.release()
+      }
+    } catch (_: Exception) {}
     wakeLock = null
   }
 

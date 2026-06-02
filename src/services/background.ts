@@ -86,4 +86,16 @@ export const BackgroundService = {
     try { return await TimerModule.scheduleReminder(message, timestampMs); }
     catch { return null; }
   },
+
+  isIgnoringBatteryOptimizations: async (): Promise<boolean> => {
+    if (Platform.OS !== 'android' || !TimerModule?.isIgnoringBatteryOptimizations) return false;
+    try { return await TimerModule.isIgnoringBatteryOptimizations(); }
+    catch { return false; }
+  },
+
+  openBatterySettings: async (): Promise<boolean> => {
+    if (Platform.OS !== 'android' || !TimerModule?.openBatterySettings) return false;
+    try { await TimerModule.openBatterySettings(); return true; }
+    catch { return false; }
+  },
 };

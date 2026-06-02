@@ -11,8 +11,7 @@ import androidx.core.app.NotificationCompat
 
 class AlarmReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
-    val message = intent.getStringExtra("message") ?: "Time for your reminder!"
-    val id = intent.getIntExtra("reminder_id", 1002)
+    val type = intent.getStringExtra("type") ?: "reminder"
 
     val channelId = "reminder_channel"
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -22,6 +21,7 @@ class AlarmReceiver : BroadcastReceiver() {
       ).apply {
         description = "Scheduled reminders and alerts"
         enableVibration(true)
+        enableLights(true)
       }
       val manager = context.getSystemService(NotificationManager::class.java)
       manager.createNotificationChannel(channel)
@@ -29,12 +29,30 @@ class AlarmReceiver : BroadcastReceiver() {
 
     val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
     val pendingIntent = PendingIntent.getActivity(
-      context, id, launchIntent,
+      context, type.hashCode(), launchIntent,
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
+    val (title, message) = when (type) {
+      "timer_complete" -> {
+        val timerType = intent.getStringExtra("timer_type") ?: ""
+        val label = when (timerType) {
+          "big_break" -> "Break over! Time to study."
+          "waiting" -> "Schedule started! Let's go!"
+          else -> "Study phase complete!"
+        }
+        Pair("Phase Study - Timer Done", label)
+      }
+      else -> {
+        val msg = intent.getStringExtra("message") ?: "Time for your reminder!"
+        Pair("Phase Study - Reminder", msg)
+      }
+    }
+
+    val id = intent.getIntExtra("reminder_id", type.hashCode())
+
     val notification = NotificationCompat.Builder(context, channelId)
-      .setContentTitle("Phase Study - Reminder")
+      .setContentTitle(title)
       .setContentText(message)
       .setSmallIcon(com.studyengine.R.mipmap.ic_launcher)
       .setAutoCancel(true)

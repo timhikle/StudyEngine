@@ -3,7 +3,10 @@ package com.studyengine
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -155,6 +158,36 @@ class TimerModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
       promise.resolve(id)
     } catch (e: Exception) {
       promise.reject("ALARM_ERROR", e.message)
+    }
+  }
+
+  @ReactMethod
+  fun isIgnoringBatteryOptimizations(promise: Promise) {
+    try {
+      val ctx = reactApplicationContext
+      val pm = ctx.getSystemService(android.content.Context.POWER_SERVICE) as PowerManager
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        promise.resolve(pm.isIgnoringBatteryOptimizations(ctx.packageName))
+      } else {
+        promise.resolve(true)
+      }
+    } catch (e: Exception) {
+      promise.reject("BATTERY_ERROR", e.message)
+    }
+  }
+
+  @ReactMethod
+  fun openBatterySettings(promise: Promise) {
+    try {
+      val ctx = reactApplicationContext
+      val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+        data = Uri.parse("package:${ctx.packageName}")
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      }
+      ctx.startActivity(intent)
+      promise.resolve(true)
+    } catch (e: Exception) {
+      promise.reject("BATTERY_ERROR", e.message)
     }
   }
 }
