@@ -54,6 +54,7 @@ export interface AppSettings {
   intervalsPerPhase: number;   // study intervals before big break
   soundEnabled: boolean;       // Tier A (interval transition) sound
   tierBEnabled: boolean;      // Tier B (phase/break end) sound
+  autoContinue: boolean;       // auto-dismiss Tier B alerts after 5s
 }
 
 export interface AppState {
@@ -69,6 +70,7 @@ export interface AppState {
   waitingUntil: string | null;
   tierBAlert: boolean;
   tierBType: TierBType;
+  autoContinueCountdown: number | null;  // seconds remaining before auto-dismiss
   consoleInput: string;
   suggestion: string | null;
   isConsoleLocked: boolean;
@@ -92,6 +94,7 @@ export interface AppState {
   pauseTimer: () => void;
   resumeTimer: () => void;
   dismissAlert: () => void;
+  tickAutoContinue: () => void;
   updateSchedule: (phases: ScheduleBlock[]) => void;
   extendBreak: (phaseIndex: number, minutes: number) => void;
   delayPhase: (phaseIndex: number, minutes: number) => void;

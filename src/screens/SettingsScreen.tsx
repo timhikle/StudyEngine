@@ -18,7 +18,7 @@ export const SettingsScreen: React.FC = () => {
     if (next !== current) updateSettings({ [key]: next });
   };
 
-  const toggle = (key: 'soundEnabled' | 'tierBEnabled') => {
+  const toggle = (key: 'soundEnabled' | 'tierBEnabled' | 'autoContinue') => {
     updateSettings({ [key]: !settings[key] });
   };
 
@@ -69,6 +69,9 @@ export const SettingsScreen: React.FC = () => {
 
         <ToggleRow label={t('soundEnabled')} value={settings.soundEnabled} onToggle={() => toggle('soundEnabled')} />
         <ToggleRow label={t('tierBEnabled')} value={settings.tierBEnabled} onToggle={() => toggle('tierBEnabled')} />
+
+        <Text style={[styles.sectionTitle, { marginTop: spacing.lg }]}>{t('autoContinue')}</Text>
+        <ToggleRow label={t('autoContinue')} value={settings.autoContinue} onToggle={() => toggle('autoContinue')} />
 
         <View style={styles.about}>
           <Text style={styles.aboutText}>Phase Study v1.0</Text>

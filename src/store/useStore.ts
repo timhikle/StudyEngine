@@ -55,6 +55,7 @@ export const useStore = create<AppState>((set, get) => ({
   waitingUntil: null,
   tierBAlert: false,
   tierBType: null,
+  autoContinueCountdown: null,
   consoleInput: '',
   suggestion: null,
   isConsoleLocked: false,
@@ -76,6 +77,7 @@ export const useStore = create<AppState>((set, get) => ({
     intervalsPerPhase: INTERVALS_PER_PHASE,
     soundEnabled: true,
     tierBEnabled: true,
+    autoContinue: false,
   },
 
   setConsoleInput: (input: string) => set({ consoleInput: input }),
@@ -179,6 +181,7 @@ export const useStore = create<AppState>((set, get) => ({
         isRunning: false,
         tierBAlert: true,
         tierBType: 'big_break_end',
+        autoContinueCountdown: state.settings.autoContinue ? 5 : null,
         version: state.version + 1,
       });
       return;
@@ -205,6 +208,7 @@ export const useStore = create<AppState>((set, get) => ({
         isRunning: false,
         tierBAlert: true,
         tierBType: 'phase_end',
+        autoContinueCountdown: state.settings.autoContinue ? 5 : null,
         totalStudiedSeconds: state.totalStudiedSeconds + added,
         dailyHistory: addToDailyHistory(state, added),
         sessionHistory: [...state.sessionHistory, { phaseIndex: state.currentPhaseIndex, completedAt: new Date().toISOString() }],
@@ -302,7 +306,7 @@ export const useStore = create<AppState>((set, get) => ({
     BackgroundService.resume();
   },
 
-  clearSchedule: () => {
+    clearSchedule: () => {
     set((s) => ({
       schedule: [],
       intervals: [],
@@ -316,6 +320,7 @@ export const useStore = create<AppState>((set, get) => ({
       suggestion: null,
       tierBAlert: false,
       tierBType: null,
+      autoContinueCountdown: null,
       version: s.version + 1,
     }));
     BackgroundService.stop();
@@ -327,7 +332,6 @@ export const useStore = create<AppState>((set, get) => ({
     const sett = state.settings;
 
     if (state.tierBType === 'phase_end') {
-      // Check if there's a Big Break after this phase
       const hasBigBreak = state.schedule.some(
         (b) => b.type === 'big_break' && b.phaseIndex === state.currentPhaseIndex
       );
@@ -335,6 +339,7 @@ export const useStore = create<AppState>((set, get) => ({
         set({
           tierBAlert: false,
           tierBType: null,
+          autoContinueCountdown: null,
           isRunning: true,
           activeTimerType: 'big_break',
           bigBreakTimeRemaining: sett.bigBreakDuration * 60,
@@ -357,6 +362,7 @@ export const useStore = create<AppState>((set, get) => ({
             activeTimerType: 'phase_intervals',
             tierBAlert: false,
             tierBType: null,
+            autoContinueCountdown: null,
             version: state.version + 1,
           });
           BackgroundService.start(sett.studyDuration * 60, 'phase_intervals');
@@ -364,6 +370,7 @@ export const useStore = create<AppState>((set, get) => ({
           set({
             tierBAlert: false,
             tierBType: null,
+            autoContinueCountdown: null,
             isRunning: false,
             activeTimerType: null,
             isSessionComplete: true,
@@ -395,6 +402,7 @@ export const useStore = create<AppState>((set, get) => ({
           activeTimerType: 'phase_intervals',
           tierBAlert: false,
           tierBType: null,
+          autoContinueCountdown: null,
           version: state.version + 1,
         });
         BackgroundService.start(sett.studyDuration * 60, 'phase_intervals');
@@ -402,6 +410,7 @@ export const useStore = create<AppState>((set, get) => ({
         set({
           tierBAlert: false,
           tierBType: null,
+          autoContinueCountdown: null,
           isRunning: false,
           activeTimerType: null,
           isSessionComplete: true,
@@ -416,7 +425,18 @@ export const useStore = create<AppState>((set, get) => ({
       return;
     }
 
-    set({ tierBAlert: false, tierBType: null });
+    set({ tierBAlert: false, tierBType: null, autoContinueCountdown: null });
+  },
+
+  tickAutoContinue: () => {
+    const state = get();
+    if (state.autoContinueCountdown === null || !state.tierBAlert) return;
+    const next = state.autoContinueCountdown - 1;
+    if (next <= 0) {
+      get().dismissAlert();
+    } else {
+      set({ autoContinueCountdown: next, version: state.version + 1 });
+    }
   },
 
   updateSchedule: (phases: ScheduleBlock[]) => {

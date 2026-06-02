@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../theme';
 import { useStore } from '../store/useStore';
 import { useT } from '../i18n';
@@ -7,12 +7,31 @@ import { useT } from '../i18n';
 export const NotificationBar: React.FC = () => {
   const tierBAlert = useStore((s) => s.tierBAlert);
   const tierBType = useStore((s) => s.tierBType);
+  const autoContinueCountdown = useStore((s) => s.autoContinueCountdown);
   const dismissAlert = useStore((s) => s.dismissAlert);
+  const tickAutoContinue = useStore((s) => s.tickAutoContinue);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const t = useT();
+
+  useEffect(() => {
+    if (autoContinueCountdown !== null && tierBAlert) {
+      intervalRef.current = setInterval(() => {
+        tickAutoContinue();
+      }, 1000);
+    }
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [autoContinueCountdown, tierBAlert, tickAutoContinue]);
 
   if (!tierBAlert) return null;
 
   const isPhaseEnd = tierBType === 'phase_end';
+  const showCountdown = autoContinueCountdown !== null;
+  const btnLabel = showCountdown ? `${t('dismiss')} (${autoContinueCountdown})` : t('dismiss');
 
   return (
     <View style={styles.overlay}>
@@ -38,7 +57,7 @@ export const NotificationBar: React.FC = () => {
           onPress={dismissAlert}
           activeOpacity={0.8}
         >
-          <Text style={styles.dismissText}>{t('dismiss')}</Text>
+          <Text style={styles.dismissText}>{btnLabel}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
