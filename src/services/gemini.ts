@@ -3,7 +3,7 @@ import { parseTimeString, getNowISO } from '../utils/time';
 import { generateScheduleBlocks } from '../utils/schedule';
 import { GEMINI_API_KEY } from '../config';
 
-const GEMINI_MODEL = 'gemini-2.5-flash-lite';
+const GEMINI_MODEL = 'gemini-flash-lite-latest';
 
 let apiKey = GEMINI_API_KEY;
 export function setGeminiApiKey(key: string) { apiKey = key; }

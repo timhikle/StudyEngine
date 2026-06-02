@@ -23,7 +23,7 @@ const translations: Record<Lang, Record<string, string>> = {
     phaseFinished: 'Your study phase has finished. Time for a Big Break!',
     breakFinished: 'Your Big Break is over. Ready for the next phase?',
     aiConsole: 'AI Console',
-    gemini: 'Gemini 2.5 Flash-Lite',
+    gemini: 'Gemini Flash-Lite',
     aiOnline: 'AI Online',
     schedule: 'Schedule',
     scheduleTimeline: 'Schedule Timeline',
