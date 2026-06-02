@@ -2,11 +2,13 @@ import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, StatusBar, ScrollView, TouchableOpacity } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../theme';
 import { useStore } from '../store/useStore';
+import { useT } from '../i18n';
 
 export const SettingsScreen: React.FC = () => {
   const settings = useStore((s) => s.settings);
   const updateSettings = useStore((s) => s.updateSettings);
   const schedule = useStore((s) => s.schedule);
+  const t = useT();
 
   const inc = (key: 'studyDuration' | 'shortBreakDuration' | 'phaseDuration' | 'bigBreakDuration' | 'intervalsPerPhase', delta: number) => {
     const min = key === 'intervalsPerPhase' ? 2 : 5;
@@ -25,7 +27,7 @@ export const SettingsScreen: React.FC = () => {
       <StatusBar barStyle="light-content" backgroundColor={colors.canvas} />
       <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.title}>Settings</Text>
+          <Text style={styles.title}>{t('settings')}</Text>
         </View>
 
         {schedule.length > 0 && (
@@ -34,18 +36,39 @@ export const SettingsScreen: React.FC = () => {
           </View>
         )}
 
-        <Text style={styles.sectionTitle}>Study Intervals</Text>
+        <Text style={styles.sectionTitle}>{t('language')}</Text>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>{t('language')}</Text>
+          <View style={styles.langRow}>
+            <TouchableOpacity
+              style={[styles.langBtn, settings.lang === 'en' && styles.langBtnActive]}
+              onPress={() => updateSettings({ lang: 'en' })}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.langBtnText, settings.lang === 'en' && styles.langBtnTextActive]}>{t('english')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.langBtn, settings.lang === 'ar' && styles.langBtnActive]}
+              onPress={() => updateSettings({ lang: 'ar' })}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.langBtnText, settings.lang === 'ar' && styles.langBtnTextActive]}>{t('arabic')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
-        <SettingRow label="Study Duration" value={`${settings.studyDuration}m`} onDec={() => inc('studyDuration', -5)} onInc={() => inc('studyDuration', 5)} />
-        <SettingRow label="Short Break" value={`${settings.shortBreakDuration}m`} onDec={() => inc('shortBreakDuration', -1)} onInc={() => inc('shortBreakDuration', 1)} />
-        <SettingRow label="Phase Duration" value={`${settings.phaseDuration}m`} onDec={() => inc('phaseDuration', -10)} onInc={() => inc('phaseDuration', 10)} />
-        <SettingRow label="Big Break" value={`${settings.bigBreakDuration}m`} onDec={() => inc('bigBreakDuration', -5)} onInc={() => inc('bigBreakDuration', 5)} />
-        <SettingRow label="Intervals per Phase" value={`${settings.intervalsPerPhase}`} onDec={() => inc('intervalsPerPhase', -1)} onInc={() => inc('intervalsPerPhase', 1)} />
+        <Text style={styles.sectionTitle}>{t('study')} {t('interval')}s</Text>
+
+        <SettingRow label={t('studyDuration')} value={`${settings.studyDuration} ${t('minutes')}`} onDec={() => inc('studyDuration', -5)} onInc={() => inc('studyDuration', 5)} />
+        <SettingRow label={t('shortBreakDuration')} value={`${settings.shortBreakDuration} ${t('minutes')}`} onDec={() => inc('shortBreakDuration', -1)} onInc={() => inc('shortBreakDuration', 1)} />
+        <SettingRow label={t('phaseDuration')} value={`${settings.phaseDuration} ${t('minutes')}`} onDec={() => inc('phaseDuration', -10)} onInc={() => inc('phaseDuration', 10)} />
+        <SettingRow label={t('bigBreakDuration')} value={`${settings.bigBreakDuration} ${t('minutes')}`} onDec={() => inc('bigBreakDuration', -5)} onInc={() => inc('bigBreakDuration', 5)} />
+        <SettingRow label={t('intervalsPerPhase')} value={`${settings.intervalsPerPhase}`} onDec={() => inc('intervalsPerPhase', -1)} onInc={() => inc('intervalsPerPhase', 1)} />
 
         <Text style={[styles.sectionTitle, { marginTop: spacing.lg }]}>Sound</Text>
 
-        <ToggleRow label="Interval Alert (Tier A)" value={settings.soundEnabled} onToggle={() => toggle('soundEnabled')} />
-        <ToggleRow label="Phase/Break Alert (Tier B)" value={settings.tierBEnabled} onToggle={() => toggle('tierBEnabled')} />
+        <ToggleRow label={t('soundEnabled')} value={settings.soundEnabled} onToggle={() => toggle('soundEnabled')} />
+        <ToggleRow label={t('tierBEnabled')} value={settings.tierBEnabled} onToggle={() => toggle('tierBEnabled')} />
 
         <View style={styles.about}>
           <Text style={styles.aboutText}>Phase Study v1.0</Text>
@@ -103,7 +126,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm, paddingHorizontal: spacing.md,
     borderWidth: 1, borderColor: colors.cardBorder, marginBottom: spacing.sm,
   },
-  rowLabel: { ...typography.body, color: colors.activeText },
+  rowLabel: { ...typography.body, color: colors.activeText, flex: 1 },
   rowControl: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   adjBtn: {
     width: 36, height: 36, borderRadius: borderRadius.full,
@@ -119,6 +142,14 @@ const styles = StyleSheet.create({
   toggleOn: { backgroundColor: colors.accent, borderColor: colors.accent },
   toggleKnob: { width: 20, height: 20, borderRadius: 10, backgroundColor: colors.secondary },
   toggleKnobOn: { backgroundColor: colors.canvas, alignSelf: 'flex-end' },
+  langRow: { flexDirection: 'row', gap: 8 },
+  langBtn: {
+    paddingHorizontal: 16, paddingVertical: 6, borderRadius: borderRadius.sm,
+    borderWidth: 1, borderColor: colors.cardBorder, backgroundColor: colors.canvas,
+  },
+  langBtnActive: { borderColor: colors.accent, backgroundColor: `${colors.accent}20` },
+  langBtnText: { color: colors.secondary, fontSize: 13, fontWeight: '600' },
+  langBtnTextActive: { color: colors.accent },
   about: { alignItems: 'center', marginTop: spacing.xl, opacity: 0.5 },
   aboutText: { ...typography.bodySmall, color: colors.secondary },
   aboutSub: { ...typography.label, color: colors.secondary, fontSize: 11 },

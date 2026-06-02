@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../theme';
 import { ScheduleBlock } from '../types';
 import { formatTimeLabel } from '../utils/time';
+import { useT } from '../i18n';
 
 interface PhaseCardProps {
   block: ScheduleBlock;
@@ -11,6 +12,8 @@ interface PhaseCardProps {
 }
 
 export const PhaseCard: React.FC<PhaseCardProps> = ({ block, isActive, isCompleted }) => {
+  const t = useT();
+
   return (
     <View
       style={[
@@ -37,7 +40,7 @@ export const PhaseCard: React.FC<PhaseCardProps> = ({ block, isActive, isComplet
           ]}
         >
           <Text style={styles.badgeText}>
-            {isActive ? 'ACTIVE' : isCompleted ? 'DONE' : 'PENDING'}
+            {isActive ? t('active') : isCompleted ? t('done') : t('pending')}
           </Text>
         </View>
       </View>
@@ -45,7 +48,7 @@ export const PhaseCard: React.FC<PhaseCardProps> = ({ block, isActive, isComplet
         <Text style={styles.timeText}>
           {formatTimeLabel(block.startTime)} - {formatTimeLabel(block.endTime)}
         </Text>
-        <Text style={styles.durationText}>{block.duration} min</Text>
+        <Text style={styles.durationText}>{block.duration} {t('minutes')}</Text>
       </View>
     </View>
   );
@@ -83,41 +86,18 @@ const styles = StyleSheet.create({
     color: colors.activeText,
     fontWeight: '600',
   },
-  activeLabel: {
-    color: colors.accent,
-  },
-  completedLabel: {
-    color: colors.success,
-  },
+  activeLabel: { color: colors.accent },
+  completedLabel: { color: colors.success },
   badge: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: borderRadius.sm,
     backgroundColor: colors.cardBorder,
   },
-  activeBadge: {
-    backgroundColor: colors.accent,
-  },
-  completedBadge: {
-    backgroundColor: colors.success,
-  },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.canvas,
-    letterSpacing: 1,
-  },
-  timeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  timeText: {
-    ...typography.bodySmall,
-    color: colors.secondary,
-  },
-  durationText: {
-    ...typography.bodySmall,
-    color: colors.secondary,
-  },
+  activeBadge: { backgroundColor: colors.accent },
+  completedBadge: { backgroundColor: colors.success },
+  badgeText: { fontSize: 10, fontWeight: '700', color: colors.canvas, letterSpacing: 1 },
+  timeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  timeText: { ...typography.bodySmall, color: colors.secondary },
+  durationText: { ...typography.bodySmall, color: colors.secondary },
 });

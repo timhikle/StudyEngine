@@ -4,6 +4,7 @@ import { colors, typography, spacing, borderRadius } from '../theme';
 import { ScheduleBlock } from '../types';
 import { PhaseCard } from './PhaseCard';
 import { BigBreakCard } from './BigBreakCard';
+import { useT } from '../i18n';
 
 interface PhaseTimelineProps {
   schedule: ScheduleBlock[];
@@ -12,13 +13,14 @@ interface PhaseTimelineProps {
 
 export const PhaseTimeline: React.FC<PhaseTimelineProps> = ({ schedule, currentPhaseIndex }) => {
   const blocks = useMemo(() => schedule, [schedule]);
+  const t = useT();
 
   if (blocks.length === 0) {
     return (
       <View style={styles.empty}>
-        <Text style={styles.emptyText}>No schedule yet</Text>
+        <Text style={styles.emptyText}>{t('noScheduleYet')}</Text>
         <Text style={styles.emptySubtext}>
-          Use the AI Console to set your study schedule
+          {t('noScheduleHint')}
         </Text>
       </View>
     );
@@ -54,25 +56,8 @@ export const PhaseTimeline: React.FC<PhaseTimelineProps> = ({ schedule, currentP
 };
 
 const styles = StyleSheet.create({
-  list: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  empty: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-  },
-  emptyText: {
-    ...typography.h3,
-    color: colors.secondary,
-    marginBottom: spacing.sm,
-  },
-  emptySubtext: {
-    ...typography.body,
-    color: colors.secondary,
-    textAlign: 'center',
-    opacity: 0.7,
-  },
+  list: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  empty: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.xl },
+  emptyText: { ...typography.h3, color: colors.secondary, marginBottom: spacing.sm },
+  emptySubtext: { ...typography.body, color: colors.secondary, textAlign: 'center', opacity: 0.7 },
 });

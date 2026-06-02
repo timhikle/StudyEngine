@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Animated, StyleSheet } from 'react-native';
 import { colors, typography } from '../theme';
 import { formatTime } from '../utils/time';
+import { useT } from '../i18n';
 
 interface TimerDisplayProps {
   timeRemaining: number;
@@ -16,6 +17,8 @@ export const TimerDisplay: React.FC<TimerDisplayProps> = ({
   isRunning,
   progress,
 }) => {
+  const t = useT();
+
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{intervalLabel}</Text>
@@ -28,29 +31,15 @@ export const TimerDisplay: React.FC<TimerDisplayProps> = ({
         {formatTime(timeRemaining)}
       </Text>
       <Text style={styles.status}>
-        {isRunning ? 'FOCUS' : 'PAUSED'}
+        {isRunning ? t('focus') : t('paused')}
       </Text>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    paddingVertical: 24,
-  },
-  label: {
-    ...typography.label,
-    color: colors.secondary,
-    marginBottom: 8,
-  },
-  time: {
-    ...typography.timer,
-    marginVertical: 8,
-  },
-  status: {
-    ...typography.bodySmall,
-    color: colors.accent,
-    letterSpacing: 4,
-  },
+  container: { alignItems: 'center', paddingVertical: 24 },
+  label: { ...typography.label, color: colors.secondary, marginBottom: 8 },
+  time: { ...typography.timer, marginVertical: 8 },
+  status: { ...typography.bodySmall, color: colors.accent, letterSpacing: 4 },
 });

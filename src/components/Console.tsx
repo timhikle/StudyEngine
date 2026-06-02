@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../theme';
 import { useStore } from '../store/useStore';
+import { useT, getLang } from '../i18n';
 
 export const Console: React.FC = () => {
   const inputRef = useRef<TextInput>(null);
@@ -20,6 +21,7 @@ export const Console: React.FC = () => {
   const isParsing = useStore((s) => s.isParsing);
   const isConsoleLocked = useStore((s) => s.isConsoleLocked);
   const error = useStore((s) => s.error);
+  const t = useT();
 
   const handleSend = useCallback(() => {
     if (!consoleInput.trim() || isConsoleLocked) return;
@@ -35,9 +37,9 @@ export const Console: React.FC = () => {
     >
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.title}>AI Console</Text>
+          <Text style={styles.title}>{t('aiConsole')}</Text>
           <View style={styles.statusDot} />
-          <Text style={styles.statusText}>Gemini 2.5 Flash-Lite</Text>
+          <Text style={styles.statusText}>{t('gemini')}</Text>
         </View>
 
         {error && (
@@ -52,35 +54,26 @@ export const Console: React.FC = () => {
             style={styles.input}
             value={consoleInput}
             onChangeText={setConsoleInput}
-            placeholder="I want to study from 3:00 PM to 7:00 PM"
+            placeholder={getLang() === 'ar' ? t('consoleHintAr') : t('consoleHint')}
             placeholderTextColor={colors.secondary}
-            multiline
-            maxLength={500}
-            editable={!isConsoleLocked}
+            multiline={false}
             onSubmitEditing={handleSend}
-            blurOnSubmit
+            returnKeyType="send"
+            editable={!isConsoleLocked}
+            autoCorrect={false}
           />
           <TouchableOpacity
-            style={[
-              styles.sendButton,
-              !canSend && styles.sendButtonDisabled,
-            ]}
+            style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
             onPress={handleSend}
             disabled={!canSend}
             activeOpacity={0.7}
           >
             {isParsing ? (
-              <ActivityIndicator size="small" color={colors.canvas} />
+              <ActivityIndicator color={colors.canvas} size="small" />
             ) : (
-              <Text style={styles.sendIcon}>→</Text>
+              <Text style={[styles.sendText, !canSend && styles.sendTextDisabled]}>→</Text>
             )}
           </TouchableOpacity>
-        </View>
-
-        <View style={styles.hints}>
-          <Text style={styles.hintText}>
-            Try: "Extend break", "أدرس من 3 إلى 7", "مدد الاستراحة 10 دقائق"
-          </Text>
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -88,93 +81,60 @@ export const Console: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  wrapper: {
-    width: '100%',
-  },
+  wrapper: { zIndex: 10 },
   container: {
     backgroundColor: colors.card,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
     marginHorizontal: spacing.md,
-    marginVertical: spacing.sm,
+    marginTop: spacing.sm,
+    borderRadius: borderRadius.lg,
     borderWidth: 1,
     borderColor: colors.cardBorder,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
   },
-  title: {
-    ...typography.body,
-    color: colors.accent,
-    fontWeight: '600',
-    marginRight: spacing.sm,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.accent,
-    marginRight: spacing.xs,
-  },
-  statusText: {
-    ...typography.bodySmall,
-    color: colors.secondary,
-    fontSize: 11,
-  },
+  title: { ...typography.bodySmall, color: colors.activeText, fontWeight: '700', marginRight: spacing.xs },
+  statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accent, marginRight: spacing.xs },
+  statusText: { ...typography.label, color: colors.accent, fontSize: 10 },
   errorBanner: {
-    backgroundColor: colors.alert + '20',
-    borderRadius: borderRadius.sm,
-    padding: spacing.sm,
+    backgroundColor: 'rgba(239,68,68,0.1)',
+    marginHorizontal: spacing.md,
     marginBottom: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: borderRadius.sm,
   },
-  errorText: {
-    color: colors.alert,
-    fontSize: 13,
-  },
+  errorText: { color: colors.alert, fontSize: 12 },
   inputRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
   },
   input: {
     flex: 1,
+    ...typography.body,
+    color: colors.activeText,
     backgroundColor: colors.canvas,
     borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    color: colors.activeText,
-    fontSize: 15,
-    lineHeight: 20,
-    maxHeight: 80,
+    paddingHorizontal: spacing.md,
+    marginRight: spacing.sm,
     borderWidth: 1,
     borderColor: colors.cardBorder,
   },
   sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.md,
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.full,
     backgroundColor: colors.accent,
-    justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: spacing.sm,
+    justifyContent: 'center',
   },
-  sendButtonDisabled: {
-    backgroundColor: colors.cardBorder,
-    opacity: 0.5,
-  },
-  sendIcon: {
-    fontSize: 20,
-    color: colors.canvas,
-    fontWeight: '700',
-  },
-  hints: {
-    marginTop: spacing.sm,
-  },
-  hintText: {
-    ...typography.bodySmall,
-    color: colors.secondary,
-    fontSize: 12,
-    opacity: 0.7,
-  },
+  sendButtonDisabled: { backgroundColor: colors.cardBorder },
+  sendText: { color: colors.canvas, fontSize: 18 },
+  sendTextDisabled: { color: colors.secondary },
 });

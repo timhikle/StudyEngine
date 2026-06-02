@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, StatusBar, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, StatusBar, ScrollView } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../theme';
 import { useStore } from '../store/useStore';
+import { useT } from '../i18n';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const BAR_MAX_HEIGHT = 140;
@@ -17,14 +18,13 @@ function getWeekDays(): string[] {
   return days;
 }
 
-interface Props {
-  embedded?: boolean;
-}
+interface Props { embedded?: boolean }
 
 export const StatsScreen: React.FC<Props> = ({ embedded }) => {
   const dailyHistory = useStore((s) => s.dailyHistory);
   const totalStudiedSeconds = useStore((s) => s.totalStudiedSeconds);
   const sessionHistory = useStore((s) => s.sessionHistory);
+  const t = useT();
 
   const weekDays = useMemo(() => getWeekDays(), []);
 
@@ -48,31 +48,31 @@ export const StatsScreen: React.FC<Props> = ({ embedded }) => {
   const weekHours = Math.round((weekTotal / 3600) * 10) / 10;
   const avgDaily = weekDays.length > 0 ? Math.round((weekHours / weekDays.length) * 10) / 10 : 0;
 
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   const chartContent = (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
-        <Text style={styles.title}>Statistics</Text>
+        <Text style={styles.title}>{t('stats')}</Text>
       </View>
 
-        {/* Summary cards */}
         <View style={styles.summaryRow}>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryNum}>{todayHours}</Text>
-            <Text style={styles.summaryLabel}>Today</Text>
+            <Text style={styles.summaryLabel}>{t('today')}</Text>
           </View>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryNum}>{weekHours}</Text>
-            <Text style={styles.summaryLabel}>This Week</Text>
+            <Text style={styles.summaryLabel}>{t('thisWeek')}</Text>
           </View>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryNum}>{totalHours}</Text>
-            <Text style={styles.summaryLabel}>All Time</Text>
+            <Text style={styles.summaryLabel}>{t('allTime')}</Text>
           </View>
         </View>
 
-        {/* Weekly bar chart */}
         <View style={styles.chartCard}>
-          <Text style={styles.chartTitle}>Weekly Hours</Text>
+          <Text style={styles.chartTitle}>{t('weeklyHours')}</Text>
           <View style={styles.chart}>
             <View style={styles.barsRow}>
               {weekData.map((d) => {
@@ -85,11 +85,11 @@ export const StatsScreen: React.FC<Props> = ({ embedded }) => {
                         styles.bar,
                         {
                           height: Math.max(barHeight, d.hours > 0 ? 4 : 0),
-                          backgroundColor: d.date === new Date().toISOString().slice(0, 10) ? colors.accent : colors.cardBorder,
+                          backgroundColor: d.date === todayStr ? colors.accent : colors.cardBorder,
                         },
                       ]}
                     />
-                    <Text style={[styles.barLabel, d.date === new Date().toISOString().slice(0, 10) && { color: colors.accent }]}>
+                    <Text style={[styles.barLabel, d.date === todayStr && { color: colors.accent }]}>
                       {d.label}
                     </Text>
                   </View>
@@ -98,19 +98,18 @@ export const StatsScreen: React.FC<Props> = ({ embedded }) => {
             </View>
           </View>
           <View style={styles.avgRow}>
-            <Text style={styles.avgText}>Daily avg: {avgDaily}h</Text>
-            <Text style={styles.avgText}>{phasesCompleted} phases completed</Text>
+            <Text style={styles.avgText}>{t('dailyAvg')}: {avgDaily}h</Text>
+            <Text style={styles.avgText}>{phasesCompleted} {t('phasesCompleted')}</Text>
           </View>
         </View>
 
-        {/* Recent activity */}
         {sessionHistory.length > 0 && (
           <View style={styles.historyCard}>
-            <Text style={styles.chartTitle}>Recent Sessions</Text>
+            <Text style={styles.chartTitle}>{t('recentSessions')}</Text>
             {[...sessionHistory].reverse().slice(0, 10).map((s, i) => (
               <View key={i} style={styles.historyRow}>
                 <Text style={styles.historyDate}>{new Date(s.completedAt).toLocaleDateString()}</Text>
-                <Text style={styles.historyPhase}>Phase {s.phaseIndex + 1}</Text>
+                <Text style={styles.historyPhase}>{t('phase')} {s.phaseIndex + 1}</Text>
               </View>
             ))}
           </View>
@@ -134,22 +133,11 @@ const styles = StyleSheet.create({
   scrollContent: { padding: spacing.lg, paddingBottom: 60 },
   header: { marginBottom: spacing.lg },
   title: { ...typography.h3, color: colors.activeText },
-
-  // Summary
   summaryRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
-  summaryCard: {
-    flex: 1, backgroundColor: colors.card, borderRadius: borderRadius.md,
-    padding: spacing.md, alignItems: 'center',
-    borderWidth: 1, borderColor: colors.cardBorder,
-  },
+  summaryCard: { flex: 1, backgroundColor: colors.card, borderRadius: borderRadius.md, padding: spacing.md, alignItems: 'center', borderWidth: 1, borderColor: colors.cardBorder },
   summaryNum: { ...typography.h2, color: colors.accent, fontSize: 28 },
   summaryLabel: { ...typography.label, color: colors.secondary, marginTop: 4 },
-
-  // Chart
-  chartCard: {
-    backgroundColor: colors.card, borderRadius: borderRadius.lg, padding: spacing.md,
-    borderWidth: 1, borderColor: colors.cardBorder, marginBottom: spacing.md,
-  },
+  chartCard: { backgroundColor: colors.card, borderRadius: borderRadius.lg, padding: spacing.md, borderWidth: 1, borderColor: colors.cardBorder, marginBottom: spacing.md },
   chartTitle: { ...typography.label, color: colors.secondary, marginBottom: spacing.md },
   chart: { marginBottom: spacing.sm },
   barsRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: BAR_MAX_HEIGHT + 30 },
@@ -159,16 +147,8 @@ const styles = StyleSheet.create({
   barLabel: { ...typography.label, color: colors.secondary, marginTop: 6, fontSize: 11 },
   avgRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.sm },
   avgText: { ...typography.bodySmall, color: colors.secondary, opacity: 0.7 },
-
-  // History
-  historyCard: {
-    backgroundColor: colors.card, borderRadius: borderRadius.lg, padding: spacing.md,
-    borderWidth: 1, borderColor: colors.cardBorder,
-  },
-  historyRow: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.cardBorder,
-  },
+  historyCard: { backgroundColor: colors.card, borderRadius: borderRadius.lg, padding: spacing.md, borderWidth: 1, borderColor: colors.cardBorder },
+  historyRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.cardBorder },
   historyDate: { ...typography.bodySmall, color: colors.secondary },
   historyPhase: { ...typography.bodySmall, color: colors.accent },
 });

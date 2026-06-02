@@ -68,6 +68,7 @@ export const useStore = create<AppState>((set, get) => ({
   isSessionComplete: false,
   sessionCompleteStats: null,
   settings: {
+    lang: 'en',
     studyDuration: STUDY_DURATION,
     shortBreakDuration: SHORT_BREAK_DURATION,
     phaseDuration: PHASE_DURATION,

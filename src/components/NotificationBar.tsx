@@ -2,11 +2,13 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../theme';
 import { useStore } from '../store/useStore';
+import { useT } from '../i18n';
 
 export const NotificationBar: React.FC = () => {
   const tierBAlert = useStore((s) => s.tierBAlert);
   const tierBType = useStore((s) => s.tierBType);
   const dismissAlert = useStore((s) => s.dismissAlert);
+  const t = useT();
 
   if (!tierBAlert) return null;
 
@@ -22,13 +24,13 @@ export const NotificationBar: React.FC = () => {
         </View>
 
         <Text style={styles.title}>
-          {isPhaseEnd ? 'PHASE COMPLETE' : 'BREAK ENDED'}
+          {isPhaseEnd ? t('phaseComplete') : t('breakEnded')}
         </Text>
 
         <Text style={styles.message}>
           {isPhaseEnd
-            ? 'Your study phase has finished. Time for a Big Break!'
-            : 'Your Big Break is over. Ready for the next phase?'}
+            ? t('phaseFinished')
+            : t('breakFinished')}
         </Text>
 
         <TouchableOpacity
@@ -36,7 +38,7 @@ export const NotificationBar: React.FC = () => {
           onPress={dismissAlert}
           activeOpacity={0.8}
         >
-          <Text style={styles.dismissText}>DISMISS</Text>
+          <Text style={styles.dismissText}>{t('dismiss')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -44,7 +46,7 @@ export const NotificationBar: React.FC = () => {
           onPress={dismissAlert}
           activeOpacity={0.8}
         >
-          <Text style={styles.finishEarlyText}>FINISH EARLY</Text>
+          <Text style={styles.finishEarlyText}>{t('finishEarly')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -54,37 +56,33 @@ export const NotificationBar: React.FC = () => {
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.overlay,
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1000,
-    elevation: 1000,
+    zIndex: 50,
   },
   card: {
     backgroundColor: colors.card,
     borderRadius: borderRadius.xl,
     padding: spacing.xl,
-    marginHorizontal: spacing.xl,
+    width: '85%',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.alert + '40',
-    width: '85%',
+    borderColor: '#ef4444',
   },
-  iconRow: {
-    marginBottom: spacing.lg,
-  },
+  iconRow: { marginBottom: spacing.md },
   alertPulse: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: colors.alert + '20',
-    justifyContent: 'center',
+    backgroundColor: 'rgba(239,68,68,0.15)',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   alertDot: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: colors.alert,
   },
   title: {
@@ -97,37 +95,38 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.secondary,
     textAlign: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
     lineHeight: 22,
   },
   dismissButton: {
-    backgroundColor: colors.accent,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    width: '100%',
+    backgroundColor: colors.alert,
+    borderRadius: borderRadius.full,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xxl,
+    width: '80%',
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
   dismissText: {
-    color: colors.canvas,
+    ...typography.body,
+    color: 'white',
     fontWeight: '700',
-    fontSize: 16,
-    letterSpacing: 1,
+    letterSpacing: 2,
   },
   finishEarlyButton: {
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    width: '100%',
+    borderRadius: borderRadius.full,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xxl,
+    width: '80%',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.alert,
+    borderColor: colors.cardBorder,
+    backgroundColor: 'transparent',
   },
   finishEarlyText: {
-    color: colors.alert,
-    fontWeight: '700',
-    fontSize: 14,
-    letterSpacing: 1,
+    ...typography.body,
+    color: colors.secondary,
+    fontWeight: '600',
+    letterSpacing: 2,
   },
 });

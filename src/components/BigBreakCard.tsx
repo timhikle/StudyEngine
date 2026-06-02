@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../theme';
 import { ScheduleBlock } from '../types';
 import { formatTimeLabel } from '../utils/time';
+import { useT } from '../i18n';
 
 interface BigBreakCardProps {
   block: ScheduleBlock;
@@ -10,6 +11,8 @@ interface BigBreakCardProps {
 }
 
 export const BigBreakCard: React.FC<BigBreakCardProps> = ({ block, isActive }) => {
+  const t = useT();
+
   return (
     <View
       style={[
@@ -27,7 +30,7 @@ export const BigBreakCard: React.FC<BigBreakCardProps> = ({ block, isActive }) =
         <Text style={styles.timeText}>
           {formatTimeLabel(block.startTime)} - {formatTimeLabel(block.endTime)}
         </Text>
-        <Text style={styles.durationText}>{block.duration} min rest</Text>
+        <Text style={styles.durationText}>{block.duration} {t('minRest')}</Text>
       </View>
       <View style={styles.statusDot}>
         <View
@@ -63,48 +66,17 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   iconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.cardBorder,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: colors.cardBorder, justifyContent: 'center', alignItems: 'center',
     marginRight: spacing.md,
   },
-  iconSymbol: {
-    fontSize: 18,
-  },
-  content: {
-    flex: 1,
-  },
-  label: {
-    ...typography.body,
-    color: colors.secondary,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  activeLabel: {
-    color: colors.warning,
-  },
-  timeText: {
-    ...typography.bodySmall,
-    color: colors.secondary,
-    marginBottom: 1,
-  },
-  durationText: {
-    ...typography.label,
-    color: colors.secondary,
-  },
-  statusDot: {
-    marginLeft: spacing.sm,
-  },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.cardBorder,
-  },
-  activeDot: {
-    backgroundColor: colors.warning,
-  },
+  iconSymbol: { fontSize: 18 },
+  content: { flex: 1 },
+  label: { ...typography.body, color: colors.secondary, fontWeight: '600', marginBottom: 2 },
+  activeLabel: { color: colors.warning },
+  timeText: { ...typography.bodySmall, color: colors.secondary, marginBottom: 1 },
+  durationText: { ...typography.label, color: colors.secondary },
+  statusDot: { marginLeft: spacing.sm },
+  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.cardBorder },
+  activeDot: { backgroundColor: colors.warning },
 });

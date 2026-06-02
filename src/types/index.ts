@@ -46,6 +46,7 @@ export interface Reminder {
 }
 
 export interface AppSettings {
+  lang: 'en' | 'ar';           // UI language
   studyDuration: number;       // minutes per study interval
   shortBreakDuration: number;  // minutes per short break
   phaseDuration: number;       // minutes per phase
