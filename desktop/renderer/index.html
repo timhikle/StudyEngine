@@ -355,6 +355,9 @@ body {
       </div>
     </div>
 
+    <div class="section-title" style="margin-top:12px">Gemini API Key</div>
+    <div id="apiKeyArea"></div>
+
     <div class="section-title" style="margin-top:12px">Study Intervals</div>
     <div id="settingsList"></div>
 
@@ -583,11 +586,13 @@ function normalizeSchedule(phases) {
 }
 
 // ==================== GEMINI API ====================
-const GEMINI_API_KEY = localStorage.getItem('gemini_api_key') || '';
+function getGeminiKey() { return localStorage.getItem('gemini_api_key') || ''; }
 const GEMINI_MODEL = 'gemini-flash-lite-latest';
 
 async function callGemini(prompt) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+  const key = getGeminiKey();
+  if (!key) throw new Error('Gemini API key not set. Add it in Settings tab.');
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1131,6 +1136,14 @@ function renderTimeline() {
   }).join('');
 }
 
+function saveApiKey(val) {
+  localStorage.setItem('gemini_api_key', val);
+}
+function toggleApiKeyVisibility() {
+  const el = document.getElementById('apiKeyInput');
+  if (el) el.type = el.type === 'password' ? 'text' : 'password';
+}
+
 function renderSettings() {
   const sett = STATE.settings;
   const configs = [
@@ -1151,6 +1164,16 @@ function renderSettings() {
       </div>
     </div>`
   ).join('');
+
+  document.getElementById('apiKeyArea').innerHTML = `
+    <div class="setting-row" style="flex-direction:column;align-items:stretch;gap:6px">
+      <span class="setting-label">Gemini API Key</span>
+      <input type="password" id="apiKeyInput" value="${getGeminiKey()}"
+        placeholder="Enter your Gemini API key"
+        style="background:var(--canvas);border:1px solid var(--card);border-radius:8px;padding:10px 14px;color:var(--active);font-size:13px;outline:none;width:100%"
+        onchange="saveApiKey(this.value)">
+      <button class="btn btn-sm" style="align-self:flex-end" onclick="toggleApiKeyVisibility()">Show/Hide</button>
+    </div>`;
 
   document.getElementById('soundSettings').innerHTML = `
     <div class="setting-row">
